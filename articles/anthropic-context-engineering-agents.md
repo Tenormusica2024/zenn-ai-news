@@ -2,7 +2,7 @@
 title: "Anthropicが提唱する「Context Engineering」- プロンプトエンジニアリングの次の段階"
 emoji: "🔧"
 type: "tech"
-topics: ["AI", "LLM", "Claude", "エージェント", "機械学習"]
+topics: ["AI", "LLM", "Claude"]
 published: true
 ---
 
