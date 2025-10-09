@@ -3,7 +3,7 @@ title: "AIニュース要約テスト記事"
 emoji: "🤖"
 type: "tech"
 topics: ["AI", "機械学習", "ニュース"]
-published: true
+published: false
 ---
 
 # はじめに
