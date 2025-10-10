@@ -13,7 +13,7 @@ https://x.com/karpathy/status/1976077806443569355
 
 ## Karpathyの投稿が話題に
 
-Andrej Karpathyが10月5日にXで投稿した、LLMの例外処理に関する観察がHacker Newsで201ポイントを獲得しています。
+Andrej Karpathy（OpenAI創設メンバー、元Tesla AI部門ディレクター）が10月5日にXで投稿した、LLMの例外処理に関する観察がHacker Newsで201ポイントを獲得しています。
 
 「ラボがRLでこれらの可哀想なLLMに何をしているのか知らないが、彼らは例外に対して死ぬほど恐れている。どんなに確率が低いケースでも。例外は正常な開発プロセスの一部なのに」
 
