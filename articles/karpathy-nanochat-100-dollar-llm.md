@@ -3,7 +3,7 @@ title: "Karpathyが$100でChatGPT作る8000行コード公開 - nanochat"
 emoji: "💰"
 type: "tech"
 topics: ["AI", "機械学習", "LLM"]
-published: false
+published: true
 ---
 
 ## 元記事
