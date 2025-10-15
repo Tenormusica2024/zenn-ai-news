@@ -13,11 +13,20 @@ https://news.ycombinator.com/item?id=45569350
 GitHub Repository by Andrej Karpathy
 https://github.com/karpathy/nanochat
 
-## Hacker Newsで903ポイント獲得
+## なぜ注目されているのか
 
-10月13日に公開されたAndrej Karpathy（OpenAI創設メンバー、元Tesla AI部門ディレクター）の新プロジェクト「nanochat」がHacker Newsで903ポイントを獲得しています。
+Andrej Karpathy（OpenAI創設メンバー、元Tesla AI部門ディレクター）が10月13日に公開した「nanochat」が、開発者コミュニティで大きな反響を呼んでいます（Hacker Newsで903ポイント獲得）。
 
-$100と4時間でChatGPTクローンを訓練できるという触れ込みで、8000行程度のミニマルなコードベースで完全なLLM訓練パイプラインを実装しています。前作のnanoGPTが事前訓練のみだったのに対し、nanochatはトークン化から推論、Web UIまで含む「フルスタック」実装です。
+注目の理由は3つあります。
+
+**1. LLM訓練の全工程を8000行で実装**  
+トークン化から推論、Web UIまで含む「フルスタック」実装を、たった8000行のミニマルなコードで実現。前作nanoGPTが事前訓練のみだったのに対し、nanochatは完全な訓練パイプラインです。
+
+**2. $100・4時間という具体的な数字**  
+8xH100ノードで4時間訓練すると約$100。「ChatGPTクローンを作るのにいくらかかるのか」という疑問に、明確な答えを示しました。
+
+**3. 教育ツールとしての設計**  
+Karpathyが開発中のLLM101nコースのキャップストーンプロジェクトとして設計。「basically entirely hand-written」とKarpathy自身が述べるように、AIコーディングツールをほぼ使わず、学習目的で一から書かれています。
 
 ## 技術仕様と訓練コスト
 
