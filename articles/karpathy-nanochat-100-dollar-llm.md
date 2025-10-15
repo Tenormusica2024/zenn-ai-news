@@ -13,11 +13,11 @@ https://news.ycombinator.com/item?id=45569350
 GitHub Repository by Andrej Karpathy
 https://github.com/karpathy/nanochat
 
-## なぜ注目されているのか
+## $100でChatGPTクローンが作れる時代
 
 Andrej Karpathy（OpenAI創設メンバー、元Tesla AI部門ディレクター）が10月13日に公開した「nanochat」が、開発者コミュニティで大きな反響を呼んでいます（Hacker Newsで903ポイント獲得）。
 
-注目の理由は3つあります。
+反響の理由は3つあります。
 
 **1. LLM訓練の全工程を8000行で実装**  
 トークン化から推論、Web UIまで含む「フルスタック」実装を、たった8000行のミニマルなコードで実現。前作nanoGPTが事前訓練のみだったのに対し、nanochatは完全な訓練パイプラインです。
