@@ -3,7 +3,7 @@ title: "Karpathy「AIエージェントは1年ではなく10年かかる」- 過
 emoji: "⏰"
 type: "tech"
 topics: ["AI", "機械学習", "LLM"]
-published: false
+published: true
 ---
 
 ## 元記事
