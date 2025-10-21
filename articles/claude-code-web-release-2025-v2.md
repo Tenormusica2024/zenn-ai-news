@@ -1,5 +1,5 @@
 ---
-title: "Claude Code がウェブ・iOS版を正式リリース！CLI版との違いと並列エージェント実行の威力"
+title: "Claude Code がウェブ・iOS版を正式リリース！CLI版との違いなど"
 emoji: "🚀"
 type: "tech"
 topics: ["AI", "Claude", "Anthropic", "開発環境", "コーディング支援"]
@@ -132,8 +132,6 @@ Claude Code（CLI版・Web版両方）では、**複数のAIエージェント�
 | **Claude Code** | 自律的なコード生成、並列エージェント実行 | エージェント型 | ✅ 可能 |
 | **GitHub Copilot** | リアルタイムのコード補完 | 補完型 | ❌ 不可 |
 | **Cursor** | エディタ統合型AIアシスタント | 統合型 | ❌ 不可 |
-| **Codex Cloud** | OpenAIのクラウドコーディングツール | エージェント型 | ⚠️ 限定的 |
-| **Jules** | Googleのコーディングエージェント | エージェント型 | ⚠️ 限定的 |
 
 ### Claude Codeの優位性
 
