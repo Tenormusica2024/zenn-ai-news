@@ -1,5 +1,5 @@
 ---
-title: "ChatGPT Atlas vs Google：AIブラウザがもたらす検索戦争とプライバシーの代償"
+title: "ChatGPT Atlas vs Google：AIブラウザがもたらす新時代の検索フローと検索戦争の激化"
 emoji: "🌐"
 type: "tech"
 topics: ["AI", "ChatGPT", "OpenAI", "Google", "プライバシー"]
