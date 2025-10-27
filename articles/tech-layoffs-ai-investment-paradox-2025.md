@@ -3,7 +3,7 @@ title: "Meta 600人レイオフの裏側：AI投資数百億ドルと人員削�
 emoji: "💼"
 type: "tech"
 topics: ["AI", "テック業界", "レイオフ", "Meta", "Microsoft"]
-published: false
+published: true
 ---
 
 ## 元記事
