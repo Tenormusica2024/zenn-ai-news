@@ -6,7 +6,7 @@ topics: ["AI", "OpenAI", "音楽生成", "著作権", "機械学習"]
 published: false
 ---
 
-## 元記事
+## 参照元
 OpenAI reportedly developing new generative music tool - TechCrunch
 https://techcrunch.com/2025/10/25/openai-reportedly-developing-new-generative-music-tool/
 
@@ -89,9 +89,9 @@ OpenAIが音楽生成市場に参入することで、いくつかの変化が�
 
 **価格競争**: OpenAIが既存サービスと異なる価格モデルを提示すれば、市場全体の価格構造が変わる可能性があります。
 
-## 個人的に気になった点
+## 率直に言って、タイミングが興味深い
 
-正直、OpenAIがこのタイミングで音楽生成に再参入するのは興味深いけど、リスクも大きいんじゃないかと思います。
+OpenAIがこのタイミングで音楽生成に再参入するのは、正直意外です。リスクもかなり大きいんじゃないかと。
 
 Jukeboxの時はまだ「実験的プロジェクト」という位置付けでしたが、今回は商用製品として提供される可能性が高い。でも、先行者が数億ドル規模の訴訟を抱えている市場に飛び込むのは、かなり大胆な判断です。
 
