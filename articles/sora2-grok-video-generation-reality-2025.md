@@ -3,7 +3,7 @@ title: "Sora 2とGrok Imagine、どっちが使えるのか - 6秒動画と60秒
 emoji: "🎬"
 type: "tech"
 topics: ["AI", "動画生成", "Sora", "Grok", "OpenAI"]
-published: false
+published: true
 ---
 
 ## 参照元
