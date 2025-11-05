@@ -3,7 +3,7 @@ title: "OpenAI、Amazon と5.8兆円契約。でもその資金どこから？"
 emoji: "💰"
 type: "tech"
 topics: ["AI", "OpenAI", "AWS", "クラウド"]
-published: false
+published: true
 ---
 
 ## 参照元
