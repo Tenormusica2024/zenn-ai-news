@@ -7,15 +7,25 @@
 ## 前提条件
 
 - Node.js 18以上
-- note.comアカウント（tenormusica7@gmail.com / Tbbr43gb）
+- note.comアカウント
 - Git
+
+## 🔒 セキュリティ重要事項
+
+**⚠️ 認証情報は絶対にGitにコミットしないでください**
+
+このガイドでは環境変数を使用して認証情報を安全に管理します。
 
 ## 1. note-post-mcp のインストール
 
 ### 1-1. リポジトリのクローン
 
 ```bash
-cd C:\Users\Tenormusica\Documents
+# Windows
+cd %USERPROFILE%\Documents
+# Mac/Linux
+cd ~/Documents
+
 git clone https://github.com/Go-555/note-post-mcp.git
 cd note-post-mcp
 ```
@@ -24,34 +34,129 @@ cd note-post-mcp
 
 ```bash
 npm install
+npm install dotenv js-yaml chalk cli-progress  # 追加パッケージ
 npm run build
 ```
 
 ### 1-3. Playwright ブラウザのインストール
 
 ```bash
-npm run install-browser
+npx playwright install chromium
 ```
 
-実行後、以下のメッセージが表示されれば成功：
+実行後、Chromiumブラウザがインストールされます。
+
+### 1-4. 環境変数ファイルの作成
+
+プロジェクトルートに `.env` ファイルを作成：
+
+```bash
+# Windows
+notepad .env
+# Mac/Linux
+nano .env
 ```
-Chromium 141.0.7390.37 downloaded to C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1179
+
+`.env` ファイルの内容：
+```env
+NOTE_EMAIL=your-email@example.com
+NOTE_PASSWORD=your-password
+```
+
+**⚠️ 必ず `.gitignore` に追加:**
+```bash
+echo ".env" >> .gitignore
+echo ".note-state.json" >> .gitignore
 ```
 
 ## 2. note.com 認証状態の取得
 
 ### 2-1. ログインスクリプトの作成
 
-`C:\Users\Tenormusica\Documents\note-post-mcp\login-note.js` を作成：
+`login-note.js` を作成：
 
 ```javascript
 import { chromium } from 'playwright';
-import fs from 'fs';
+import dotenv from 'dotenv';
+import os from 'os';
 import path from 'path';
+import chalk from 'chalk';
 
-const statePath = path.join(process.env.USERPROFILE, '.note-state.json');
+dotenv.config();
 
-console.log('1. ブラウザ起動...');
+const CONFIG = {
+  timeouts: {
+    pageLoad: 30000,
+    loginWait: 10000,
+    elementWait: 5000
+  }
+};
+
+const SELECTORS = {
+  login: {
+    email: [
+      'input[placeholder*="mail@example"]',
+      'input[type="email"]',
+      'input[name="email"]'
+    ],
+    password: [
+      'input[type="password"]',
+      'input[name="password"]'
+    ],
+    submitButton: [
+      'button:has-text("ログイン")',
+      'button[type="submit"]'
+    ]
+  }
+};
+
+function log(level, message) {
+  const timestamp = new Date().toISOString();
+  const prefix = {
+    info: chalk.blue('ℹ'),
+    success: chalk.green('✓'),
+    warn: chalk.yellow('⚠'),
+    error: chalk.red('✗')
+  }[level];
+  console.log(`${prefix} [${timestamp}] ${message}`);
+}
+
+async function findElement(page, selectorList, elementName) {
+  for (const selector of selectorList) {
+    const element = page.locator(selector);
+    const count = await element.count();
+    if (count > 0) {
+      log('success', `${elementName}を検出: ${selector}`);
+      return element;
+    }
+  }
+  throw new Error(`${elementName}が見つかりませんでした。noteのUIが変更された可能性があります。`);
+}
+
+async function retryOperation(operation, maxRetries = 3, waitTime = 2000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      log('warn', `リトライ ${i + 1}/${maxRetries}...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+}
+
+const HOME_DIR = os.homedir();
+const STATE_PATH = path.join(HOME_DIR, '.note-state.json');
+
+const email = process.env.NOTE_EMAIL;
+const password = process.env.NOTE_PASSWORD;
+
+if (!email || !password) {
+  log('error', 'NOTE_EMAILとNOTE_PASSWORDを.envファイルに設定してください');
+  process.exit(1);
+}
+
+log('info', 'ブラウザ起動...');
 const browser = await chromium.launch({
   headless: false,
   args: ['--lang=ja-JP']
@@ -64,62 +169,96 @@ const context = await browser.newContext({
 
 const page = await context.newPage();
 
-console.log('2. ログインページにアクセス...');
-await page.goto('https://note.com/login');
-await page.waitForTimeout(3000);
-
-console.log('3. 自動ログイン...');
-const emailInput = page.locator('input[placeholder*="mail@example"]');
-await emailInput.fill('tenormusica7@gmail.com');
-
-const passwordInput = page.locator('input[type="password"]');
-await passwordInput.fill('Tbbr43gb');
-
-const loginButton = page.locator('button:has-text("ログイン")');
-await loginButton.click();
-
-console.log('4. ログイン完了を待機（10秒）...');
-await page.waitForTimeout(10000);
-
-console.log('5. 認証状態を保存...');
-await context.storageState({ path: statePath });
-
-console.log('✓ 認証状態を保存しました:', statePath);
-console.log('\nブラウザを閉じてください...');
-
-await page.waitForEvent('close').catch(() => {});
-
-await browser.close();
-console.log('✓ 完了');
+try {
+  log('info', 'ログインページにアクセス...');
+  await retryOperation(async () => {
+    await page.goto('https://note.com/login', { 
+      waitUntil: 'domcontentloaded', 
+      timeout: CONFIG.timeouts.pageLoad 
+    });
+  });
+  await page.waitForTimeout(3000);
+  
+  log('info', '自動ログイン開始...');
+  const emailInput = await findElement(page, SELECTORS.login.email, 'メールアドレス入力欄');
+  await emailInput.fill(email);
+  log('success', 'メールアドレス入力完了');
+  
+  const passwordInput = await findElement(page, SELECTORS.login.password, 'パスワード入力欄');
+  await passwordInput.fill(password);
+  log('success', 'パスワード入力完了');
+  
+  const loginButton = await findElement(page, SELECTORS.login.submitButton, 'ログインボタン');
+  await loginButton.click();
+  log('success', 'ログインボタンクリック完了');
+  
+  log('info', 'ログイン完了を確認中...');
+  await page.waitForURL(/note\.com\/(?!login)/, { timeout: CONFIG.timeouts.loginWait });
+  log('success', 'ログイン成功');
+  
+  await page.waitForTimeout(2000);
+  
+  log('info', '認証状態を保存中...');
+  await context.storageState({ path: STATE_PATH });
+  log('success', `認証状態を保存しました: ${STATE_PATH}`);
+  
+  log('info', 'ブラウザを閉じてください...');
+  await page.waitForEvent('close', { timeout: 30000 }).catch(() => {});
+  
+} catch (error) {
+  log('error', `エラー: ${error.message}`);
+  await page.screenshot({ path: 'login-error.png' });
+  log('warn', 'エラー時のスクリーンショット: login-error.png');
+  throw error;
+} finally {
+  await browser.close();
+  log('success', '完了');
+}
 ```
 
 ### 2-2. ログインスクリプトの実行
 
 ```bash
-cd C:\Users\Tenormusica\Documents\note-post-mcp
 node login-note.js
 ```
 
 実行後：
 1. ブラウザが自動的に開く
 2. 自動ログインが実行される
-3. 10秒待機後、認証状態が `C:\Users\Tenormusica\.note-state.json` に保存される
+3. ログイン成功後、認証状態が `.note-state.json` に保存される
 4. ブラウザを手動で閉じる
 
-**確認:**
+**確認（OS別）:**
 ```bash
-dir C:\Users\Tenormusica\.note-state.json
+# Windows
+dir %USERPROFILE%\.note-state.json
+# Mac/Linux
+ls ~/.note-state.json
 ```
 
 ## 3. MCP Server の登録（Claude Code）
 
-### 3-1. MCP Server の登録
+### 3-1. 環境変数の設定
 
 ```bash
-claude mcp add note-post-mcp -s user -e NOTE_POST_MCP_STATE_PATH="C:\Users\Tenormusica\.note-state.json" -- npx @gonuts555/note-post-mcp@latest
+# Windows PowerShell
+$env:NOTE_POST_MCP_STATE_PATH = "$env:USERPROFILE\.note-state.json"
+
+# Mac/Linux
+export NOTE_POST_MCP_STATE_PATH="$HOME/.note-state.json"
 ```
 
-### 3-2. 登録確認
+### 3-2. MCP Server の登録
+
+```bash
+# Windows
+claude mcp add note-post-mcp -s user -e NOTE_POST_MCP_STATE_PATH="%USERPROFILE%\.note-state.json" -- npx @gonuts555/note-post-mcp@latest
+
+# Mac/Linux
+claude mcp add note-post-mcp -s user -e NOTE_POST_MCP_STATE_PATH="$HOME/.note-state.json" -- npx @gonuts555/note-post-mcp@latest
+```
+
+### 3-3. 登録確認
 
 ```bash
 claude mcp list
@@ -134,7 +273,7 @@ note-post-mcp  npx @gonuts555/note-post-mcp@latest
 
 ### 4-1. Zenn記事の取得
 
-例: `C:\Users\Tenormusica\Documents\zenn-ai-news\articles\ai-agents-70-percent-failure-reality-2025.md`
+例: `~/Documents/zenn-ai-news/articles/ai-agents-70-percent-failure-reality-2025.md`
 
 ### 4-2. note.com形式への変換
 
@@ -165,73 +304,73 @@ tags:
 本文...
 ```
 
-**変換スクリプト例:**
+**変換スクリプト（改善版）:**
 
 `convert-zenn-to-note.js`:
 ```javascript
 import fs from 'fs';
+import yaml from 'js-yaml';
+import chalk from 'chalk';
+
+function log(level, message) {
+  const prefix = {
+    info: chalk.blue('ℹ'),
+    success: chalk.green('✓'),
+    error: chalk.red('✗')
+  }[level];
+  console.log(`${prefix} ${message}`);
+}
 
 const zennPath = process.argv[2];
 const notePath = process.argv[3];
 
 if (!zennPath || !notePath) {
-  console.error('Usage: node convert-zenn-to-note.js <zenn-file> <note-file>');
+  log('error', 'Usage: node convert-zenn-to-note.js <zenn-file> <note-file>');
   process.exit(1);
 }
 
-const content = fs.readFileSync(zennPath, 'utf8');
-const lines = content.split('\n');
-
-let inFrontMatter = false;
-let frontMatterEnded = false;
-let title = '';
-const tags = [];
-const bodyLines = [];
-
-for (const line of lines) {
-  if (line.trim() === '---') {
-    if (!frontMatterEnded) {
-      inFrontMatter = !inFrontMatter;
-      if (!inFrontMatter) {
-        frontMatterEnded = true;
-      }
-      continue;
-    }
+try {
+  const content = fs.readFileSync(zennPath, 'utf8');
+  
+  // Front matter抽出
+  const frontMatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!frontMatterMatch) {
+    throw new Error('Front matterが見つかりません');
   }
   
-  if (inFrontMatter) {
-    if (line.startsWith('title:')) {
-      title = line.replace('title:', '').trim();
-    } else if (line.startsWith('topics:')) {
-      const topicsStr = line.replace('topics:', '').trim();
-      const topicsMatch = topicsStr.match(/\[(.*)\]/);
-      if (topicsMatch) {
-        const topicsList = topicsMatch[1].split(',').map(t => t.trim().replace(/"/g, ''));
-        tags.push(...topicsList);
-      }
-    }
-  } else if (frontMatterEnded) {
-    bodyLines.push(line);
-  }
+  const frontMatter = yaml.load(frontMatterMatch[1]);
+  const body = frontMatterMatch[2].trim();
+  
+  // note.com形式に変換
+  const noteContent = {
+    title: frontMatter.title || 'タイトルなし',
+    tags: frontMatter.topics || []
+  };
+  
+  let output = '---\n';
+  output += `title: ${noteContent.title}\n`;
+  output += 'tags:\n';
+  noteContent.tags.forEach(tag => {
+    output += `  - ${tag}\n`;
+  });
+  output += '---\n\n';
+  output += body;
+  
+  fs.writeFileSync(notePath, output, 'utf8');
+  log('success', `変換完了: ${notePath}`);
+  log('info', `タイトル: ${noteContent.title}`);
+  log('info', `タグ数: ${noteContent.tags.length}`);
+  log('info', `本文文字数: ${body.length}`);
+  
+} catch (error) {
+  log('error', `変換エラー: ${error.message}`);
+  process.exit(1);
 }
-
-// note.com形式で出力
-let output = '---\n';
-output += `title: ${title}\n`;
-output += 'tags:\n';
-tags.forEach(tag => {
-  output += `  - ${tag}\n`;
-});
-output += '---\n\n';
-output += bodyLines.join('\n').trim();
-
-fs.writeFileSync(notePath, output, 'utf8');
-console.log('✓ 変換完了:', notePath);
 ```
 
 **実行:**
 ```bash
-node convert-zenn-to-note.js "C:\Users\Tenormusica\Documents\zenn-ai-news\articles\ai-agents-70-percent-failure-reality-2025.md" "C:\Users\Tenormusica\Documents\note-post-mcp\ai-agents-failure-note.md"
+node convert-zenn-to-note.js "path/to/zenn-article.md" "path/to/note-article.md"
 ```
 
 ## 5. 下書き保存の実行
@@ -241,171 +380,261 @@ node convert-zenn-to-note.js "C:\Users\Tenormusica\Documents\zenn-ai-news\articl
 `save-draft.js`:
 ```javascript
 import { chromium } from 'playwright';
+import dotenv from 'dotenv';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import yaml from 'js-yaml';
+import chalk from 'chalk';
+import cliProgress from 'cli-progress';
 
-const statePath = 'C:/Users/Tenormusica/.note-state.json';
+dotenv.config();
+
+const CONFIG = {
+  timeouts: {
+    pageLoad: 30000,
+    elementWait: 10000,
+    shortWait: 1000,
+    saveConfirm: 10000
+  },
+  typing: {
+    minDelay: 10,
+    maxDelay: 30
+  },
+  maxChunkSize: 1000
+};
+
+const SELECTORS = {
+  editor: {
+    title: [
+      'textarea[placeholder*="タイトル"]',
+      'textarea[aria-label*="タイトル"]'
+    ],
+    body: [
+      'div[contenteditable="true"][role="textbox"]',
+      'div[contenteditable="true"]'
+    ],
+    saveButton: [
+      'button:has-text("下書き保存")',
+      'button[aria-label*="下書き保存"]'
+    ],
+    saveConfirm: [
+      'text=保存しました',
+      '[aria-label*="保存しました"]'
+    ],
+    closeDialog: [
+      'button[aria-label*="閉じる"]',
+      'button:has-text("×")'
+    ]
+  }
+};
+
+function log(level, message) {
+  const timestamp = new Date().toISOString();
+  const prefix = {
+    info: chalk.blue('ℹ'),
+    success: chalk.green('✓'),
+    warn: chalk.yellow('⚠'),
+    error: chalk.red('✗')
+  }[level];
+  console.log(`${prefix} [${timestamp}] ${message}`);
+}
+
+async function findElement(page, selectorList, elementName) {
+  for (const selector of selectorList) {
+    const element = page.locator(selector);
+    const count = await element.count();
+    if (count > 0) {
+      log('success', `${elementName}を検出: ${selector}`);
+      return element;
+    }
+  }
+  throw new Error(`${elementName}が見つかりませんでした`);
+}
+
+function randomDelay(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+const HOME_DIR = os.homedir();
+const STATE_PATH = path.join(HOME_DIR, '.note-state.json');
 const markdownPath = process.argv[2];
 
 if (!markdownPath) {
-  console.error('Usage: node save-draft.js <markdown-file>');
+  log('error', 'Usage: node save-draft.js <markdown-file>');
   process.exit(1);
 }
 
-// Markdownファイルを読み込み
-const content = fs.readFileSync(markdownPath, 'utf8');
-
-// Front matterとbodyを分離
-const lines = content.split('\n');
-let inFrontMatter = false;
-let frontMatterEnded = false;
-let title = '';
-const tags = [];
-const bodyLines = [];
-
-for (const line of lines) {
-  if (line.trim() === '---') {
-    if (!frontMatterEnded) {
-      inFrontMatter = !inFrontMatter;
-      if (!inFrontMatter) {
-        frontMatterEnded = true;
-      }
-      continue;
-    }
-  }
-  
-  if (inFrontMatter) {
-    if (line.startsWith('title:')) {
-      title = line.replace('title:', '').trim().replace(/^[\"']|[\"']$/g, '');
-    } else if (line.trim().startsWith('- ')) {
-      tags.push(line.trim().substring(2));
-    }
-  } else if (frontMatterEnded) {
-    bodyLines.push(line);
-  }
+if (!fs.existsSync(STATE_PATH)) {
+  log('error', `認証状態ファイルが見つかりません: ${STATE_PATH}`);
+  log('info', 'login-note.js を先に実行してください');
+  process.exit(1);
 }
-
-const body = bodyLines.join('\n').trim();
-
-console.log('タイトル:', title);
-console.log('タグ数:', tags.length);
-console.log('本文文字数:', body.length);
-
-// ブラウザを起動
-console.log('\n1. ブラウザ起動・認証状態ロード...');
-const browser = await chromium.launch({ headless: false });
-const context = await browser.newContext({ 
-  storageState: statePath,
-  locale: 'ja-JP'
-});
-const page = await context.newPage();
 
 try {
-  console.log('2. エディターページにアクセス...');
-  await page.goto('https://editor.note.com/new', { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForTimeout(3000);
+  // Markdownファイルを読み込み
+  const content = fs.readFileSync(markdownPath, 'utf8');
   
-  // AIダイアログを閉じる（存在する場合）
-  const closeButton = page.locator('button[aria-label*="閉じる"], button:has-text("×")').first();
-  if (await closeButton.count() > 0) {
-    await closeButton.click().catch(() => {});
-    await page.waitForTimeout(500);
+  // Front matter抽出
+  const frontMatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!frontMatterMatch) {
+    throw new Error('Front matterが見つかりません');
   }
   
-  console.log('3. タイトルを入力...');
-  const titleArea = page.locator('textarea[placeholder*="タイトル"]');
-  await titleArea.waitFor({ state: 'visible', timeout: 10000 });
-  await titleArea.fill(title);
-  await page.waitForTimeout(1000);
+  const frontMatter = yaml.load(frontMatterMatch[1]);
+  const body = frontMatterMatch[2].trim();
   
-  console.log('4. 本文を入力...');
-  const editor = page.locator('div[contenteditable="true"][role="textbox"]').first();
-  await editor.waitFor({ state: 'visible' });
-  await editor.click();
-  await page.waitForTimeout(500);
+  const title = frontMatter.title || 'タイトルなし';
+  const tags = frontMatter.tags || [];
   
-  // 本文を段落ごとに入力
-  const paragraphs = body.split('\n\n');
-  for (let i = 0; i < paragraphs.length; i++) {
-    await editor.pressSequentially(paragraphs[i], { delay: 5 });
-    if (i < paragraphs.length - 1) {
-      await page.keyboard.press('Enter');
-      await page.keyboard.press('Enter');
+  log('info', `タイトル: ${title}`);
+  log('info', `タグ数: ${tags.length}`);
+  log('info', `本文文字数: ${body.length}`);
+  
+  // ブラウザを起動
+  log('info', 'ブラウザ起動・認証状態ロード...');
+  const browser = await chromium.launch({ headless: false });
+  const context = await browser.newContext({ 
+    storageState: STATE_PATH,
+    locale: 'ja-JP'
+  });
+  const page = await context.newPage();
+  
+  try {
+    log('info', 'エディターページにアクセス...');
+    await page.goto('https://editor.note.com/new', { 
+      waitUntil: 'domcontentloaded', 
+      timeout: CONFIG.timeouts.pageLoad 
+    });
+    await page.waitForTimeout(CONFIG.timeouts.shortWait);
+    
+    // AIダイアログを閉じる
+    const closeButton = await findElement(page, SELECTORS.editor.closeDialog, 'ダイアログ閉じるボタン').catch(() => null);
+    if (closeButton) {
+      await closeButton.click().catch(() => {});
+      await page.waitForTimeout(500);
     }
     
-    // 進捗表示
-    if ((i + 1) % 10 === 0) {
-      console.log(`   ${i + 1}/${paragraphs.length} 段落完了`);
+    log('info', 'タイトルを入力...');
+    const titleArea = await findElement(page, SELECTORS.editor.title, 'タイトル入力欄');
+    await titleArea.waitFor({ state: 'visible', timeout: CONFIG.timeouts.elementWait });
+    await titleArea.fill(title);
+    await page.waitForTimeout(CONFIG.timeouts.shortWait);
+    
+    log('info', '本文を入力...');
+    const editor = await findElement(page, SELECTORS.editor.body, '本文エディター');
+    await editor.waitFor({ state: 'visible' });
+    await editor.click();
+    await page.waitForTimeout(500);
+    
+    // 本文を段落ごとに入力（プログレスバー付き）
+    const paragraphs = body.split('\n\n');
+    const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    progressBar.start(paragraphs.length, 0);
+    
+    for (let i = 0; i < paragraphs.length; i++) {
+      const paragraph = paragraphs[i];
+      
+      // 長い段落をチャンクに分割
+      if (paragraph.length > CONFIG.maxChunkSize) {
+        const chunks = paragraph.match(new RegExp(`.{1,${CONFIG.maxChunkSize}}`, 'g')) || [];
+        for (const chunk of chunks) {
+          await editor.pressSequentially(chunk, { 
+            delay: randomDelay(CONFIG.typing.minDelay, CONFIG.typing.maxDelay)
+          });
+          await page.waitForTimeout(100);
+        }
+      } else {
+        await editor.pressSequentially(paragraph, { 
+          delay: randomDelay(CONFIG.typing.minDelay, CONFIG.typing.maxDelay)
+        });
+      }
+      
+      if (i < paragraphs.length - 1) {
+        await page.keyboard.press('Enter');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(randomDelay(100, 500));
+      }
+      
+      progressBar.update(i + 1);
     }
+    
+    progressBar.stop();
+    
+    log('info', '下書き保存ボタンをクリック...');
+    await page.waitForTimeout(2000);
+    
+    const saveButton = await findElement(page, SELECTORS.editor.saveButton, '下書き保存ボタン');
+    await saveButton.waitFor({ state: 'visible', timeout: CONFIG.timeouts.elementWait });
+    
+    // ボタンが有効になるまで待機
+    for (let i = 0; i < 20; i++) {
+      if (await saveButton.isEnabled()) break;
+      await page.waitForTimeout(100);
+    }
+    
+    await saveButton.click();
+    log('success', '下書き保存ボタンクリック完了');
+    
+    // 「保存しました」メッセージを厳格に確認
+    try {
+      const saveConfirm = await findElement(page, SELECTORS.editor.saveConfirm, '保存完了メッセージ');
+      await saveConfirm.waitFor({ timeout: CONFIG.timeouts.saveConfirm });
+      log('success', '下書き保存成功を確認');
+    } catch (error) {
+      log('error', '下書き保存の確認に失敗しました');
+      log('warn', 'エディターURLに直接アクセスして保存状態を確認してください');
+      throw new Error('下書き保存が確認できませんでした');
+    }
+    
+    await page.waitForTimeout(3000);
+    
+    log('info', '最終確認スクリーンショット撮影...');
+    const screenshotDir = path.dirname(markdownPath);
+    await page.screenshot({ 
+      path: path.join(screenshotDir, 'draft-saved.png'), 
+      fullPage: true 
+    });
+    
+    const finalUrl = page.url();
+    log('success', '完了！');
+    log('info', `エディターURL: ${finalUrl}`);
+    log('info', 'スクリーンショット: draft-saved.png');
+    
+  } catch (error) {
+    log('error', `エラー: ${error.message}`);
+    const screenshotPath = path.join(path.dirname(markdownPath), 'draft-error.png');
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    log('warn', `エラー時のスクリーンショット: ${screenshotPath}`);
+    throw error;
+  } finally {
+    await browser.close();
   }
-  
-  console.log('5. 下書き保存ボタンをクリック...');
-  await page.waitForTimeout(2000);
-  
-  const saveButton = page.locator('button:has-text("下書き保存")').first();
-  await saveButton.waitFor({ state: 'visible', timeout: 10000 });
-  
-  // ボタンが有効になるまで待機
-  for (let i = 0; i < 20; i++) {
-    if (await saveButton.isEnabled()) break;
-    await page.waitForTimeout(100);
-  }
-  
-  await saveButton.click();
-  console.log('   ✓ 下書き保存ボタンをクリックしました');
-  
-  // 「保存しました」メッセージを待つ
-  await page.locator('text=保存しました').waitFor({ timeout: 5000 }).catch(() => {
-    console.log('   ⚠ 「保存しました」メッセージは表示されませんでしたが、処理は続行します');
-  });
-  
-  await page.waitForTimeout(3000);
-  
-  console.log('\n6. 最終確認スクリーンショット...');
-  const screenshotDir = path.dirname(markdownPath);
-  await page.screenshot({ path: path.join(screenshotDir, 'draft-saved.png'), fullPage: true });
-  
-  const finalUrl = page.url();
-  console.log('\n✅ 完了！');
-  console.log('エディターURL:', finalUrl);
-  console.log('スクリーンショット: draft-saved.png');
   
 } catch (error) {
-  console.error('❌ エラー:', error.message);
-  await page.screenshot({ path: path.join(path.dirname(markdownPath), 'draft-error.png'), fullPage: true });
+  log('error', `致命的エラー: ${error.message}`);
+  process.exit(1);
 }
-
-await browser.close();
 ```
 
 ### 5-2. 下書き保存の実行
 
 ```bash
-cd C:\Users\Tenormusica\Documents\note-post-mcp
-node save-draft.js "C:\Users\Tenormusica\Documents\note-post-mcp\ai-agents-failure-note.md"
+node save-draft.js "path/to/note-article.md"
 ```
 
 **実行結果例:**
 ```
-タイトル: AIエージェント、7割失敗してるってマジか
-タグ数: 4
-本文文字数: 6699
-
-1. ブラウザ起動・認証状態ロード...
-2. エディターページにアクセス...
-3. タイトルを入力...
-4. 本文を入力...
-   10/69 段落完了
-   20/69 段落完了
-   ...
-5. 下書き保存ボタンをクリック...
-   ✓ 下書き保存ボタンをクリックしました
-
-6. 最終確認スクリーンショット...
-
-✅ 完了！
-エディターURL: https://editor.note.com/notes/n93618151dd62/edit/
-スクリーンショット: draft-saved.png
+ℹ [2025-01-15T10:00:00.000Z] タイトル: AIエージェント、7割失敗してるってマジか
+ℹ [2025-01-15T10:00:00.001Z] タグ数: 4
+ℹ [2025-01-15T10:00:00.002Z] 本文文字数: 6699
+ℹ [2025-01-15T10:00:00.003Z] ブラウザ起動・認証状態ロード...
+ℹ [2025-01-15T10:00:05.000Z] エディターページにアクセス...
+✓ [2025-01-15T10:00:10.000Z] タイトル入力欄を検出: textarea[placeholder*="タイトル"]
+...
+✓ [2025-01-15T10:05:00.000Z] 下書き保存成功を確認
+✓ [2025-01-15T10:05:05.000Z] 完了！
+ℹ [2025-01-15T10:05:05.001Z] エディターURL: https://editor.note.com/notes/n93618151dd62/edit/
 ```
 
 ## 6. 下書きの確認
@@ -423,13 +652,12 @@ node save-draft.js "C:\Users\Tenormusica\Documents\note-post-mcp\ai-agents-failu
 
 ## 7. トラブルシューティング
 
-### 7-1. 認証エラー（Timeout 180000ms exceeded）
+### 7-1. 認証エラー（Timeout exceeded）
 
 **原因:** `.note-state.json` の認証情報が期限切れ
 
 **解決方法:**
 ```bash
-cd C:\Users\Tenormusica\Documents\note-post-mcp
 node login-note.js
 ```
 
@@ -437,59 +665,82 @@ node login-note.js
 
 **エラー:**
 ```
-Executable doesn't exist at C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1179\chrome-win\chrome.exe
+Executable doesn't exist at ...
 ```
 
 **解決方法:**
 ```bash
-cd C:\Users\Tenormusica\Documents\note-post-mcp
 npx playwright install chromium
 ```
 
-### 7-3. AIダイアログが邪魔をする
+### 7-3. 環境変数が読み込まれない
 
-**対処方法:** スクリプト内で自動的に閉じる処理が実装済み
-```javascript
-const closeButton = page.locator('button[aria-label*="閉じる"], button:has-text("×")').first();
-if (await closeButton.count() > 0) {
-  await closeButton.click().catch(() => {});
-  await page.waitForTimeout(500);
-}
-```
+**解決方法:**
+1. `.env` ファイルがプロジェクトルートにあるか確認
+2. ファイル内容を確認
+3. スクリプトを再実行
 
-## 8. 重要なURL・パス一覧
+### 7-4. セレクタが見つからない
 
-| 項目 | 値 |
-|------|-----|
-| note-post-mcpディレクトリ | `C:\Users\Tenormusica\Documents\note-post-mcp` |
-| 認証状態ファイル | `C:\Users\Tenormusica\.note-state.json` |
-| Zenn記事ディレクトリ | `C:\Users\Tenormusica\Documents\zenn-ai-news\articles` |
-| note.comログインページ | `https://note.com/login` |
-| note.comエディター（新規） | `https://editor.note.com/new` |
-| note.comエディター（編集） | `https://editor.note.com/notes/[記事ID]/edit/` |
+**原因:** noteのUI変更
+
+**対処方法:**
+1. エラーメッセージを確認
+2. `SELECTORS` オブジェクトのフォールバックを活用
+3. 必要に応じてセレクタを更新
+
+## 8. セキュリティのベストプラクティス
+
+1. **認証情報の保護:**
+   - `.env` を `.gitignore` に追加
+   - `.note-state.json` を `.gitignore` に追加
+   - パスワードは定期的に変更
+
+2. **アクセス権限:**
+   - `.env` のパーミッションを制限（Mac/Linux: `chmod 600 .env`）
+   - `.note-state.json` も同様に制限
+
+3. **バックアップ:**
+   - 重要な記事は下書き保存前にバックアップ
+   - スクリーンショットで動作を記録
 
 ## 9. 正しいセレクタ一覧
 
-note.comのエディターで使用する正しいセレクタ：
+note.comのエディターで使用する正しいセレクタ（フォールバック含む）：
 
-| 要素 | セレクタ | 用途 |
-|------|----------|------|
-| タイトル入力欄 | `textarea[placeholder*="タイトル"]` | タイトル入力 |
-| 本文エディター | `div[contenteditable="true"][role="textbox"]` | 本文入力 |
-| 下書き保存ボタン | `button:has-text("下書き保存")` | 下書き保存 |
-| 公開ボタン | `button:has-text("公開に進む")` | 公開処理 |
-| 閉じるボタン | `button[aria-label*="閉じる"]` | ダイアログ閉じる |
+| 要素 | 優先度1 | 優先度2 | 優先度3 |
+|------|---------|---------|---------|
+| タイトル | `textarea[placeholder*="タイトル"]` | `textarea[aria-label*="タイトル"]` | - |
+| 本文 | `div[contenteditable="true"][role="textbox"]` | `div[contenteditable="true"]` | - |
+| 下書き保存 | `button:has-text("下書き保存")` | `button[aria-label*="下書き保存"]` | - |
+| 保存確認 | `text=保存しました` | `[aria-label*="保存しました"]` | - |
 
 ## 10. MCP Tool の使用（Claude Code経由）
 
-### 10-1. Claude Codeから直接実行
+### 10-1. 環境変数の設定
+
+Claude Codeの設定で環境変数を設定：
+
+```json
+{
+  "mcpServers": {
+    "note-post-mcp": {
+      "env": {
+        "NOTE_POST_MCP_STATE_PATH": "${HOME}/.note-state.json"
+      }
+    }
+  }
+}
+```
+
+### 10-2. Claude Codeから実行
 
 ```javascript
 // Claude Code内で実行
 mcp__note-post-mcp__save_draft({
-  markdown_path: "C:/Users/Tenormusica/Documents/note-post-mcp/ai-agents-failure-note.md",
-  state_path: "C:/Users/Tenormusica/.note-state.json",
-  screenshot_dir: "C:/Users/Tenormusica/Documents/note-post-mcp",
+  markdown_path: "~/Documents/note-post-mcp/note-article.md",
+  state_path: "~/.note-state.json",
+  screenshot_dir: "~/Documents/note-post-mcp",
   timeout: 300000
 })
 ```
@@ -499,15 +750,15 @@ mcp__note-post-mcp__save_draft({
 ```
 1. Zenn記事作成
    ↓
-2. note.com形式に変換（Front matter変換）
+2. .env ファイルに認証情報設定
    ↓
-3. note.com認証状態確認（必要なら再ログイン）
+3. login-note.js で認証状態取得
    ↓
-4. save-draft.js 実行
+4. convert-zenn-to-note.js で形式変換
    ↓
-5. エディターで記事入力（自動）
+5. save-draft.js で下書き保存
    ↓
-6. 下書き保存ボタンクリック（自動）
+6. 保存成功確認（エラー時はリトライ）
    ↓
 7. エディターURL取得
    ↓
@@ -519,9 +770,12 @@ mcp__note-post-mcp__save_draft({
 - **note-post-mcp GitHub:** https://github.com/Go-555/note-post-mcp
 - **Playwright Documentation:** https://playwright.dev/
 - **note.com:** https://note.com/
+- **dotenv Documentation:** https://github.com/motdotla/dotenv
+- **js-yaml Documentation:** https://github.com/nodeca/js-yaml
 
 ## 補足
 
-- 本ガイドは `tenormusica7@gmail.com` アカウント専用です
-- 認証情報は定期的に更新が必要です（セッション期限切れ対策）
+- 本ガイドはWindows/Mac/Linux対応です
+- 認証情報は定期的に更新が必要です
 - 大量の記事を一度に投稿する場合は、適切な待機時間を設けてください
+- noteのUIが変更された場合、セレクタのフォールバック機能が自動で対応します
