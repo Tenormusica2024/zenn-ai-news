@@ -1,10 +1,20 @@
-# note.com 自動投稿システム セットアップガイド（実装版）
+# note.com 半自動投稿ツール セットアップガイド（プロトタイプ版）
 
 ## 概要
 
-このガイドでは、Zenn記事をnote.comに自動投稿するための実際の手順を説明します。
+このガイドでは、Zenn記事をnote.comに投稿するための実際の手順を説明します。
 
 **📌 重要**: このドキュメントは実際に存在するファイルに基づいています。
+
+## ⚠️ 重要な制限事項
+
+このツールは**プロトタイプ**です。以下の作業は手動で行う必要があります：
+
+- **Zenn記事のnote.com形式への変換**（Front matter編集が必須）
+- **スクリプト内のファイルパス編集**（自分の環境に合わせて変更）
+- **認証状態の定期的な更新**（セッション期限切れ時）
+
+完全自動化は現在未実装です。
 
 ## 前提条件
 
@@ -169,8 +179,8 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 
-const statePath = 'C:/Users/Tenormusica/.note-state.json';
-const markdownPath = 'C:/Users/Tenormusica/Documents/note-post-mcp/ai-agents-failure-note.md';
+const statePath = 'C:/Users/YOUR_USERNAME/.note-state.json';
+const markdownPath = 'C:/Users/YOUR_USERNAME/Documents/note-post-mcp/YOUR_ARTICLE.md';
 
 // Markdownファイルを読み込み
 const content = fs.readFileSync(markdownPath, 'utf8');
@@ -282,7 +292,7 @@ try {
   await page.waitForTimeout(3000);
   
   console.log('\n6. 最終確認スクリーンショット...');
-  await page.screenshot({ path: 'C:/Users/Tenormusica/Documents/note-post-mcp/draft-saved-final.png', fullPage: true });
+  await page.screenshot({ path: 'C:/Users/YOUR_USERNAME/Documents/note-post-mcp/draft-saved-final.png', fullPage: true });
   
   const finalUrl = page.url();
   console.log('\n✅ 完了！');
@@ -291,7 +301,7 @@ try {
   
 } catch (error) {
   console.error('❌ エラー:', error.message);
-  await page.screenshot({ path: 'C:/Users/Tenormusica/Documents/note-post-mcp/draft-error-final.png', fullPage: true });
+  await page.screenshot({ path: 'C:/Users/YOUR_USERNAME/Documents/note-post-mcp/draft-error-final.png', fullPage: true });
 }
 
 await browser.close();
@@ -299,22 +309,17 @@ await browser.close();
 
 ### 4-2. スクリプトのカスタマイズ
 
-**⚠️ 重要**: 実際に使用する前に以下の値を変更してください：
+**⚠️ 重要**: 上記のサンプルコードは既にプレースホルダー（`YOUR_USERNAME`, `YOUR_ARTICLE.md`）を使用しています。実際に使用する前に、これらを自分の環境に合わせて変更してください：
 
-1. **認証状態ファイルのパス**（5行目）:
-   ```javascript
-   const statePath = 'C:/Users/[あなたのユーザー名]/.note-state.json';
-   ```
+1. **認証状態ファイルのパス**（172行目）:
+   - `YOUR_USERNAME` → あなたのWindowsユーザー名
 
-2. **Markdownファイルのパス**（6行目）:
-   ```javascript
-   const markdownPath = 'C:/Users/[あなたのユーザー名]/Documents/note-post-mcp/[あなたの記事ファイル].md';
-   ```
+2. **Markdownファイルのパス**（173行目）:
+   - `YOUR_USERNAME` → あなたのWindowsユーザー名
+   - `YOUR_ARTICLE.md` → 実際の記事ファイル名
 
-3. **スクリーンショット保存先**（118行目、127行目）:
-   ```javascript
-   await page.screenshot({ path: 'C:/Users/[あなたのユーザー名]/Documents/note-post-mcp/draft-saved-final.png', fullPage: true });
-   ```
+3. **スクリーンショット保存先**（285行目、294行目）:
+   - `YOUR_USERNAME` → あなたのWindowsユーザー名
 
 ### 4-3. 下書き保存の実行
 
