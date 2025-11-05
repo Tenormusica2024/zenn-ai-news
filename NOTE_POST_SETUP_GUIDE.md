@@ -34,7 +34,7 @@ cd note-post-mcp
 
 ```bash
 npm install
-npm install dotenv js-yaml chalk cli-progress  # 追加パッケージ
+npm install dotenv js-yaml chalk cli-progress keytar  # 追加パッケージ（keytarは認証情報の暗号化用）
 npm run build
 ```
 
@@ -61,6 +61,18 @@ nano .env
 ```env
 NOTE_EMAIL=your-email@example.com
 NOTE_PASSWORD=your-password
+```
+
+**🔒 セキュリティ強化（推奨）:**
+
+暗号化ストレージを使用する場合（より安全）：
+
+```bash
+# Mac/Linux
+chmod 600 .env
+
+# keytarを使用した認証情報の保存（オプション）
+node -e "const keytar = require('keytar'); keytar.setPassword('note-post-mcp', 'email', 'your-email@example.com'); keytar.setPassword('note-post-mcp', 'password', 'your-password');"
 ```
 
 **⚠️ 必ず `.gitignore` に追加:**
@@ -148,11 +160,31 @@ async function retryOperation(operation, maxRetries = 3, waitTime = 2000) {
 const HOME_DIR = os.homedir();
 const STATE_PATH = path.join(HOME_DIR, '.note-state.json');
 
-const email = process.env.NOTE_EMAIL;
-const password = process.env.NOTE_PASSWORD;
+// 認証情報の取得（keytarを優先、フォールバックとして.env）
+let email, password;
+try {
+  const keytar = await import('keytar').catch(() => null);
+  if (keytar) {
+    email = await keytar.getPassword('note-post-mcp', 'email');
+    password = await keytar.getPassword('note-post-mcp', 'password');
+    if (email && password) {
+      log('success', '暗号化ストレージから認証情報を取得');
+    }
+  }
+} catch (error) {
+  log('warn', 'keytarが利用できません。.envから読み込みます。');
+}
 
 if (!email || !password) {
-  log('error', 'NOTE_EMAILとNOTE_PASSWORDを.envファイルに設定してください');
+  email = process.env.NOTE_EMAIL;
+  password = process.env.NOTE_PASSWORD;
+  if (email && password) {
+    log('warn', '.envファイルから認証情報を取得（推奨: keytarで暗号化）');
+  }
+}
+
+if (!email || !password) {
+  log('error', 'NOTE_EMAILとNOTE_PASSWORDを.envまたはkeytarに設定してください');
   process.exit(1);
 }
 
@@ -465,10 +497,34 @@ if (!markdownPath) {
   process.exit(1);
 }
 
+// 認証状態ファイルの存在確認と有効期限検証
 if (!fs.existsSync(STATE_PATH)) {
   log('error', `認証状態ファイルが見つかりません: ${STATE_PATH}`);
   log('info', 'login-note.js を先に実行してください');
   process.exit(1);
+}
+
+// ファイルの更新日時を確認（7日以上経過していたら警告）
+const stats = fs.statSync(STATE_PATH);
+const daysSinceUpdate = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24);
+if (daysSinceUpdate > 7) {
+  log('warn', `認証状態ファイルが ${Math.floor(daysSinceUpdate)} 日前に作成されました`);
+  log('warn', 'セッションが期限切れの場合、login-note.js を再実行してください');
+}
+
+// Cookie有効期限の検証
+try {
+  const stateContent = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+  const cookies = stateContent.cookies || [];
+  const now = Date.now();
+  const expiredCookies = cookies.filter(c => c.expires && c.expires * 1000 < now);
+  if (expiredCookies.length > 0) {
+    log('error', `${expiredCookies.length} 個のCookieが期限切れです`);
+    log('error', 'login-note.js を実行して認証状態を更新してください');
+    process.exit(1);
+  }
+} catch (error) {
+  log('warn', `認証状態ファイルの検証に失敗: ${error.message}`);
 }
 
 try {
@@ -542,18 +598,43 @@ try {
           await editor.pressSequentially(chunk, { 
             delay: randomDelay(CONFIG.typing.minDelay, CONFIG.typing.maxDelay)
           });
-          await page.waitForTimeout(100);
+          await page.waitForTimeout(randomDelay(100, 300));
         }
       } else {
-        await editor.pressSequentially(paragraph, { 
-          delay: randomDelay(CONFIG.typing.minDelay, CONFIG.typing.maxDelay)
-        });
+        // 人間らしい入力パターンを実装
+        const sentences = paragraph.split(/([。、！？.!?])/);
+        for (let j = 0; j < sentences.length; j++) {
+          const sentence = sentences[j];
+          if (!sentence) continue;
+          
+          // 文章ごとに入力
+          await editor.pressSequentially(sentence, { 
+            delay: randomDelay(CONFIG.typing.minDelay, CONFIG.typing.maxDelay)
+          });
+          
+          // 句読点の後は長めの停止（人間らしさ）
+          if (/[。、！？.!?]/.test(sentence)) {
+            await page.waitForTimeout(randomDelay(300, 800));
+          }
+          
+          // ランダムにマウス移動（bot検出回避）
+          if (Math.random() < 0.3) {
+            const box = await editor.boundingBox();
+            if (box) {
+              await page.mouse.move(
+                box.x + Math.random() * box.width,
+                box.y + Math.random() * box.height,
+                { steps: randomDelay(5, 15) }
+              );
+            }
+          }
+        }
       }
       
       if (i < paragraphs.length - 1) {
         await page.keyboard.press('Enter');
         await page.keyboard.press('Enter');
-        await page.waitForTimeout(randomDelay(100, 500));
+        await page.waitForTimeout(randomDelay(200, 700));
       }
       
       progressBar.update(i + 1);
@@ -576,15 +657,49 @@ try {
     await saveButton.click();
     log('success', '下書き保存ボタンクリック完了');
     
-    // 「保存しました」メッセージを厳格に確認
+    // 「保存しました」メッセージを多段階で厳格に確認
+    let saveConfirmed = false;
+    
+    // ステップ1: メッセージ要素の確認
     try {
       const saveConfirm = await findElement(page, SELECTORS.editor.saveConfirm, '保存完了メッセージ');
       await saveConfirm.waitFor({ timeout: CONFIG.timeouts.saveConfirm });
-      log('success', '下書き保存成功を確認');
+      saveConfirmed = true;
+      log('success', '保存メッセージを確認');
     } catch (error) {
-      log('error', '下書き保存の確認に失敗しました');
-      log('warn', 'エディターURLに直接アクセスして保存状態を確認してください');
+      log('warn', '保存メッセージが見つかりません。追加検証を実施します...');
+    }
+    
+    // ステップ2: URL変化の確認（下書き保存後はURLが変わる）
+    const currentUrl = page.url();
+    if (!saveConfirmed && currentUrl.includes('/notes/n') && currentUrl.includes('/edit')) {
+      log('success', 'エディターURLの変化を確認（下書き保存成功の可能性大）');
+      saveConfirmed = true;
+    }
+    
+    // ステップ3: DOM要素の存在確認（編集画面の保存状態）
+    if (!saveConfirmed) {
+      try {
+        const savedIndicator = await page.locator('[data-saved="true"], .note-saved, [aria-label*="保存済み"]').count();
+        if (savedIndicator > 0) {
+          log('success', '保存済み状態を示すDOM要素を確認');
+          saveConfirmed = true;
+        }
+      } catch (error) {
+        log('warn', 'DOM要素による確認も失敗');
+      }
+    }
+    
+    // ステップ4: 最終判定
+    if (!saveConfirmed) {
+      log('error', '下書き保存の確認に失敗しました（全ての検証方法で保存を確認できませんでした）');
+      log('error', '以下の手段で手動確認してください:');
+      log('error', `1. エディターURL（${currentUrl}）に直接アクセス`);
+      log('error', '2. note.com > 記事の管理 > 下書き一覧で確認');
+      await page.screenshot({ path: path.join(path.dirname(markdownPath), 'save-verification-failed.png'), fullPage: true });
       throw new Error('下書き保存が確認できませんでした');
+    } else {
+      log('success', '下書き保存成功を確認（多段階検証完了）');
     }
     
     await page.waitForTimeout(3000);
