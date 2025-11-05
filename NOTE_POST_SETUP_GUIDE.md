@@ -30,15 +30,128 @@ git clone https://github.com/Go-555/note-post-mcp.git
 cd note-post-mcp
 ```
 
-### 1-2. 依存関係のインストール
+### 1-2. プロジェクト構造の作成
+
+```bash
+# 共通モジュール用ディレクトリ作成
+mkdir -p utils config
+```
+
+### 1-3. 依存関係のインストール
 
 ```bash
 npm install
-npm install dotenv js-yaml chalk cli-progress keytar  # 追加パッケージ（keytarは認証情報の暗号化用）
+npm install dotenv js-yaml chalk cli-progress keytar  # keytarは任意（利用不可の場合は.envにフォールバック）
 npm run build
 ```
 
-### 1-3. Playwright ブラウザのインストール
+### 1-4. 共通モジュールの作成
+
+#### utils/browser-helpers.js
+
+```javascript
+import chalk from 'chalk';
+
+export function randomDelay(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+export function log(level, message) {
+  const timestamp = new Date().toISOString();
+  const prefix = {
+    info: chalk.blue('ℹ'),
+    success: chalk.green('✓'),
+    warn: chalk.yellow('⚠'),
+    error: chalk.red('✗')
+  }[level];
+  console.log(`${prefix} [${timestamp}] ${message}`);
+}
+
+export async function findElement(page, selectorList, elementName) {
+  for (const selector of selectorList) {
+    const element = page.locator(selector);
+    const count = await element.count();
+    if (count > 0) {
+      log('success', `${elementName}を検出: ${selector}`);
+      return element;
+    }
+  }
+  throw new Error(`${elementName}が見つかりませんでした。noteのUIが変更された可能性があります。`);
+}
+
+export async function retryOperation(operation, maxRetries = 3, waitTime = 2000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      log('warn', `リトライ ${i + 1}/${maxRetries}...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+}
+```
+
+#### config/note-config.js
+
+```javascript
+export const CONFIG = {
+  timeouts: {
+    pageLoad: 30000,
+    loginWait: 10000,
+    elementWait: 10000,
+    shortWait: 1000,
+    saveConfirm: 10000
+  },
+  typing: {
+    minDelay: 10,
+    maxDelay: 30
+  },
+  maxChunkSize: 1000
+};
+
+export const SELECTORS = {
+  login: {
+    email: [
+      'input[placeholder*="mail@example"]',
+      'input[type="email"]',
+      'input[name="email"]'
+    ],
+    password: [
+      'input[type="password"]',
+      'input[name="password"]'
+    ],
+    submitButton: [
+      'button:has-text("ログイン")',
+      'button[type="submit"]'
+    ]
+  },
+  editor: {
+    title: [
+      'textarea[placeholder*="タイトル"]',
+      'textarea[aria-label*="タイトル"]'
+    ],
+    body: [
+      'div[contenteditable="true"][role="textbox"]',
+      'div[contenteditable="true"]'
+    ],
+    saveButton: [
+      'button:has-text("下書き保存")',
+      'button[aria-label*="下書き保存"]'
+    ],
+    saveConfirm: [
+      'text=保存しました',
+      '[aria-label*="保存しました"]'
+    ],
+    closeDialog: [
+      'button[aria-label*="閉じる"]',
+      'button:has-text("×")'
+    ]
+  }
+};
+```
+
+### 1-5. Playwright ブラウザのインストール
 
 ```bash
 npx playwright install chromium
@@ -46,7 +159,7 @@ npx playwright install chromium
 
 実行後、Chromiumブラウザがインストールされます。
 
-### 1-4. 環境変数ファイルの作成
+### 1-6. 環境変数ファイルの作成
 
 プロジェクトルートに `.env` ファイルを作成：
 
@@ -92,87 +205,33 @@ import { chromium } from 'playwright';
 import dotenv from 'dotenv';
 import os from 'os';
 import path from 'path';
-import chalk from 'chalk';
+import { log, findElement, retryOperation } from './utils/browser-helpers.js';
+import { CONFIG, SELECTORS } from './config/note-config.js';
 
 dotenv.config();
 
-const CONFIG = {
-  timeouts: {
-    pageLoad: 30000,
-    loginWait: 10000,
-    elementWait: 5000
-  }
-};
-
-const SELECTORS = {
-  login: {
-    email: [
-      'input[placeholder*="mail@example"]',
-      'input[type="email"]',
-      'input[name="email"]'
-    ],
-    password: [
-      'input[type="password"]',
-      'input[name="password"]'
-    ],
-    submitButton: [
-      'button:has-text("ログイン")',
-      'button[type="submit"]'
-    ]
-  }
-};
-
-function log(level, message) {
-  const timestamp = new Date().toISOString();
-  const prefix = {
-    info: chalk.blue('ℹ'),
-    success: chalk.green('✓'),
-    warn: chalk.yellow('⚠'),
-    error: chalk.red('✗')
-  }[level];
-  console.log(`${prefix} [${timestamp}] ${message}`);
-}
-
-async function findElement(page, selectorList, elementName) {
-  for (const selector of selectorList) {
-    const element = page.locator(selector);
-    const count = await element.count();
-    if (count > 0) {
-      log('success', `${elementName}を検出: ${selector}`);
-      return element;
-    }
-  }
-  throw new Error(`${elementName}が見つかりませんでした。noteのUIが変更された可能性があります。`);
-}
-
-async function retryOperation(operation, maxRetries = 3, waitTime = 2000) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (i === maxRetries - 1) throw error;
-      log('warn', `リトライ ${i + 1}/${maxRetries}...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-  }
-}
-
-const HOME_DIR = os.homedir();
-const STATE_PATH = path.join(HOME_DIR, '.note-state.json');
+const STATE_PATH = path.join(os.homedir(), '.note-state.json');
 
 // 認証情報の取得（keytarを優先、フォールバックとして.env）
 let email, password;
+let authSource = 'なし';
+
 try {
   const keytar = await import('keytar').catch(() => null);
-  if (keytar) {
-    email = await keytar.getPassword('note-post-mcp', 'email');
-    password = await keytar.getPassword('note-post-mcp', 'password');
-    if (email && password) {
-      log('success', '暗号化ストレージから認証情報を取得');
+  if (keytar && keytar.default) {
+    try {
+      email = await keytar.default.getPassword('note-post-mcp', 'email');
+      password = await keytar.default.getPassword('note-post-mcp', 'password');
+      if (email && password) {
+        log('success', '暗号化ストレージから認証情報を取得');
+        authSource = 'keytar';
+      }
+    } catch (getError) {
+      log('warn', `keytar読み込み失敗: ${getError.message}`);
     }
   }
-} catch (error) {
-  log('warn', 'keytarが利用できません。.envから読み込みます。');
+} catch (importError) {
+  log('warn', `keytarモジュールのインポート失敗: ${importError.message}`);
 }
 
 if (!email || !password) {
@@ -180,13 +239,17 @@ if (!email || !password) {
   password = process.env.NOTE_PASSWORD;
   if (email && password) {
     log('warn', '.envファイルから認証情報を取得（推奨: keytarで暗号化）');
+    authSource = '.env';
   }
 }
 
 if (!email || !password) {
   log('error', 'NOTE_EMAILとNOTE_PASSWORDを.envまたはkeytarに設定してください');
+  log('info', `確認済み: keytar(${authSource === 'keytar' ? '成功' : '失敗'}), .env(${process.env.NOTE_EMAIL ? '存在' : '未設定'})`);
   process.exit(1);
 }
+
+log('info', `認証情報ソース: ${authSource}`);
 
 log('info', 'ブラウザ起動...');
 const browser = await chromium.launch({
@@ -342,16 +405,7 @@ tags:
 ```javascript
 import fs from 'fs';
 import yaml from 'js-yaml';
-import chalk from 'chalk';
-
-function log(level, message) {
-  const prefix = {
-    info: chalk.blue('ℹ'),
-    success: chalk.green('✓'),
-    error: chalk.red('✗')
-  }[level];
-  console.log(`${prefix} ${message}`);
-}
+import { log } from './utils/browser-helpers.js';
 
 const zennPath = process.argv[2];
 const notePath = process.argv[3];
@@ -417,79 +471,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
-import chalk from 'chalk';
 import cliProgress from 'cli-progress';
+import { log, findElement, retryOperation, randomDelay } from './utils/browser-helpers.js';
+import { CONFIG, SELECTORS } from './config/note-config.js';
 
 dotenv.config();
 
-const CONFIG = {
-  timeouts: {
-    pageLoad: 30000,
-    elementWait: 10000,
-    shortWait: 1000,
-    saveConfirm: 10000
-  },
-  typing: {
-    minDelay: 10,
-    maxDelay: 30
-  },
-  maxChunkSize: 1000
-};
-
-const SELECTORS = {
-  editor: {
-    title: [
-      'textarea[placeholder*="タイトル"]',
-      'textarea[aria-label*="タイトル"]'
-    ],
-    body: [
-      'div[contenteditable="true"][role="textbox"]',
-      'div[contenteditable="true"]'
-    ],
-    saveButton: [
-      'button:has-text("下書き保存")',
-      'button[aria-label*="下書き保存"]'
-    ],
-    saveConfirm: [
-      'text=保存しました',
-      '[aria-label*="保存しました"]'
-    ],
-    closeDialog: [
-      'button[aria-label*="閉じる"]',
-      'button:has-text("×")'
-    ]
-  }
-};
-
-function log(level, message) {
-  const timestamp = new Date().toISOString();
-  const prefix = {
-    info: chalk.blue('ℹ'),
-    success: chalk.green('✓'),
-    warn: chalk.yellow('⚠'),
-    error: chalk.red('✗')
-  }[level];
-  console.log(`${prefix} [${timestamp}] ${message}`);
-}
-
-async function findElement(page, selectorList, elementName) {
-  for (const selector of selectorList) {
-    const element = page.locator(selector);
-    const count = await element.count();
-    if (count > 0) {
-      log('success', `${elementName}を検出: ${selector}`);
-      return element;
-    }
-  }
-  throw new Error(`${elementName}が見つかりませんでした`);
-}
-
-function randomDelay(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-const HOME_DIR = os.homedir();
-const STATE_PATH = path.join(HOME_DIR, '.note-state.json');
+const STATE_PATH = path.join(os.homedir(), '.note-state.json');
 const markdownPath = process.argv[2];
 
 if (!markdownPath) {
@@ -558,9 +546,11 @@ try {
   
   try {
     log('info', 'エディターページにアクセス...');
-    await page.goto('https://editor.note.com/new', { 
-      waitUntil: 'domcontentloaded', 
-      timeout: CONFIG.timeouts.pageLoad 
+    await retryOperation(async () => {
+      await page.goto('https://editor.note.com/new', { 
+        waitUntil: 'domcontentloaded', 
+        timeout: CONFIG.timeouts.pageLoad 
+      });
     });
     await page.waitForTimeout(CONFIG.timeouts.shortWait);
     
@@ -617,8 +607,9 @@ try {
             await page.waitForTimeout(randomDelay(300, 800));
           }
           
-          // ランダムにマウス移動（bot検出回避）
-          if (Math.random() < 0.3) {
+          // ランダムにマウス移動（bot検出回避 - 動的確率20-50%）
+          const mouseMoveChance = 0.2 + Math.random() * 0.3;
+          if (Math.random() < mouseMoveChance) {
             const box = await editor.boundingBox();
             if (box) {
               await page.mouse.move(
@@ -627,6 +618,16 @@ try {
                 { steps: randomDelay(5, 15) }
               );
             }
+          }
+          
+          // ランダムにスクロール（bot検出回避 - 15%の確率）
+          if (Math.random() < 0.15) {
+            await page.mouse.wheel(0, randomDelay(-50, 50));
+          }
+          
+          // ランダムに思考停止（bot検出回避 - 10%の確率）
+          if (Math.random() < 0.1) {
+            await page.waitForTimeout(randomDelay(1000, 3000));
           }
         }
       }
@@ -672,21 +673,36 @@ try {
     
     // ステップ2: URL変化の確認（下書き保存後はURLが変わる）
     const currentUrl = page.url();
-    if (!saveConfirmed && currentUrl.includes('/notes/n') && currentUrl.includes('/edit')) {
-      log('success', 'エディターURLの変化を確認（下書き保存成功の可能性大）');
+    const urlPattern = /^https:\/\/editor\.note\.com\/notes\/n[a-f0-9]{13}\/edit\/$/;
+    if (!saveConfirmed && urlPattern.test(currentUrl)) {
+      log('success', 'エディターURLの変化を確認（下書き保存成功）');
       saveConfirmed = true;
     }
     
-    // ステップ3: DOM要素の存在確認（編集画面の保存状態）
+    // ステップ3: DOM要素の存在確認（より具体的なセレクタ）
     if (!saveConfirmed) {
       try {
-        const savedIndicator = await page.locator('[data-saved="true"], .note-saved, [aria-label*="保存済み"]').count();
+        // note.comの実際のDOM構造に基づくセレクタ
+        const savedIndicator = await page.locator('button[data-testid="save-button"][disabled], .editor-header__save-status:has-text("保存済み"), [aria-live="polite"]:has-text("保存しました")').count();
         if (savedIndicator > 0) {
           log('success', '保存済み状態を示すDOM要素を確認');
           saveConfirmed = true;
         }
       } catch (error) {
         log('warn', 'DOM要素による確認も失敗');
+      }
+    }
+    
+    // ステップ3.5: API-based verification（最終フォールバック）
+    if (!saveConfirmed) {
+      try {
+        const response = await page.request.get(currentUrl);
+        if (response.ok()) {
+          log('success', 'APIレスポンスで下書きの存在を確認');
+          saveConfirmed = true;
+        }
+      } catch (error) {
+        log('warn', 'API確認も失敗');
       }
     }
     
@@ -718,7 +734,8 @@ try {
     
   } catch (error) {
     log('error', `エラー: ${error.message}`);
-    const screenshotPath = path.join(path.dirname(markdownPath), 'draft-error.png');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const screenshotPath = path.join(path.dirname(markdownPath), `draft-error-${timestamp}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: true });
     log('warn', `エラー時のスクリーンショット: ${screenshotPath}`);
     throw error;
