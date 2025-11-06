@@ -456,7 +456,7 @@ Error: ENOENT: no such file or directory
 ```
 
 **解決方法:**
-- `save-draft-final.js` の182行目と183行目のパスを確認
+- `save-draft-final.js` の199行目と200行目のパスを確認
 - または、コード内の `YOUR_USERNAME` と検索して該当箇所を特定
 - Windows の場合、パスのスラッシュは `/` を使用（`\` ではない）
 
