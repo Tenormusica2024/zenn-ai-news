@@ -181,6 +181,32 @@ tags:
 
 ## 4. 下書き保存の実行
 
+### 4-0. 実行前の環境検証
+
+**必ず実行してください（問題の早期発見）:**
+
+```bash
+# Node.jsバージョン確認（18以上が必要）
+node --version
+# 出力例: v18.17.0 または v20.x.x
+
+# Playwrightインストール確認
+node -e "require('playwright'); console.log('OK: Playwright installed')"
+# 出力: OK: Playwright installed
+
+# 認証状態ファイル確認
+dir %USERPROFILE%\.note-state.json  # Windows
+ls ~/.note-state.json  # Mac/Linux
+# ファイルが存在することを確認
+
+# 記事ファイル確認
+dir "C:\Users\YOUR_USERNAME\Documents\note-post-mcp\YOUR_ARTICLE.md"  # Windows
+ls ~/Documents/note-post-mcp/YOUR_ARTICLE.md  # Mac/Linux
+# ファイルが存在することを確認
+```
+
+**⚠️ いずれかのコマンドでエラーが出た場合、このセクションの問題を解決してから次に進んでください。**
+
 ### 4-1. 下書き保存スクリプト（save-draft-final.js）
 
 ---
@@ -337,9 +363,50 @@ try {
 await browser.close();
 ```
 
-### 4-2. スクリプトのカスタマイズ
+### 4-2. スクリプトの実行方法
 
-**⚠️ 重要**: 上記のサンプルコードは既にプレースホルダー（`YOUR_USERNAME`, `YOUR_ARTICLE.md`）を使用しています。実際に使用する前に、これらを自分の環境に合わせて変更してください：
+**🚨 CRITICAL: 実コードはプレースホルダー対応済み**
+
+`save-draft-final.js` は環境変数またはコマンドライン引数でパスを指定する方式に対応しています。
+
+**方法1: コマンドライン引数で指定（推奨）**
+
+```bash
+# Windows
+node save-draft-final.js "C:/Users/YOUR_USERNAME/.note-state.json" "C:/Users/YOUR_USERNAME/Documents/note-post-mcp/YOUR_ARTICLE.md"
+
+# Mac/Linux
+node save-draft-final.js "$HOME/.note-state.json" "$HOME/Documents/note-post-mcp/YOUR_ARTICLE.md"
+```
+
+**方法2: 環境変数で指定**
+
+```bash
+# Windows PowerShell
+$env:NOTE_STATE_PATH="C:/Users/YOUR_USERNAME/.note-state.json"
+$env:MARKDOWN_PATH="C:/Users/YOUR_USERNAME/Documents/note-post-mcp/YOUR_ARTICLE.md"
+node save-draft-final.js
+
+# Mac/Linux
+export NOTE_STATE_PATH="$HOME/.note-state.json"
+export MARKDOWN_PATH="$HOME/Documents/note-post-mcp/YOUR_ARTICLE.md"
+node save-draft-final.js
+```
+
+**方法3: スクリプト内のデフォルトパスを編集**
+
+`save-draft-final.js` のLine 5-6を直接編集してください：
+
+```javascript
+const statePath = process.env.NOTE_STATE_PATH || process.argv[2] || 'C:/Users/YOUR_USERNAME/.note-state.json';
+const markdownPath = process.env.MARKDOWN_PATH || process.argv[3] || 'C:/Users/YOUR_USERNAME/Documents/note-post-mcp/YOUR_ARTICLE.md';
+```
+
+**⚠️ 重要**: `YOUR_USERNAME` と `YOUR_ARTICLE.md` を実際の値に置き換えてください。
+
+### 4-2-1. パス設定の確認
+
+**パスが正しく設定されているか確認:**
 
 **OS別のパス設定例:**
 
@@ -403,11 +470,17 @@ const markdownPath = `${process.env.HOME}/Documents/note-post-mcp/YOUR_ARTICLE.m
 
 ### 4-4. 下書き保存の実行
 
+**実行コマンド:**
+
 ```bash
+# 方法1使用時（コマンドライン引数）
+node save-draft-final.js "C:/Users/YOUR_USERNAME/.note-state.json" "C:/Users/YOUR_USERNAME/Documents/note-post-mcp/YOUR_ARTICLE.md"
+
+# 方法2または方法3使用時
 node save-draft-final.js
 ```
 
-**実行結果例:**
+**実行結果例（正常時）:**
 ```
 タイトル: AIエージェント、7割失敗してるってマジか
 タグ数: 4
@@ -419,7 +492,9 @@ node save-draft-final.js
 4. 本文を入力...
    10/50 段落完了
    20/50 段落完了
-   ...
+   30/50 段落完了
+   40/50 段落完了
+   50/50 段落完了
 5. 下書き保存ボタンをクリック...
    ✓ 下書き保存ボタンをクリックしました
 
@@ -429,6 +504,37 @@ node save-draft-final.js
 エディターURL: https://editor.note.com/notes/n93618151dd62/edit/
 スクリーンショット: draft-saved-final.png
 ```
+
+**期待される実行時間:**
+- タイトル・タグ読み込み: 即座
+- ブラウザ起動: 2-3秒
+- ページアクセス: 3-5秒
+- タイトル入力: 1秒
+- 本文入力: 記事の長さに依存（6000文字で約30秒）
+- 下書き保存: 2-3秒
+- **合計: 約40-45秒** （6000文字の記事の場合）
+
+**異常な実行結果の例:**
+
+```
+❌ エラー: パスが未設定です
+使用方法:
+  node save-draft-final.js <statePath> <markdownPath>
+または環境変数を設定:
+  set NOTE_STATE_PATH=C:/Users/YourName/.note-state.json
+  set MARKDOWN_PATH=C:/Users/YourName/Documents/note-post-mcp/your-article.md
+```
+→ **対処法**: 4-2節の方法1-3のいずれかでパスを指定
+
+```
+Error: ENOENT: no such file or directory, open 'C:/Users/YOUR_USERNAME/.note-state.json'
+```
+→ **対処法**: 7-3節「ファイルパスのエラー」を参照
+
+```
+TimeoutError: page.goto: Timeout 30000ms exceeded.
+```
+→ **対処法**: 7-1節「認証エラー」を参照
 
 ## 5. 下書きの確認
 
@@ -476,71 +582,261 @@ claude mcp list
 note-post-mcp  npx @gonuts555/note-post-mcp@latest
 ```
 
-## 7. トラブルシューティング
+## 7. トラブルシューティング（エラーパターン別詳細対処法）
 
-### 7-1. 認証エラー（Timeout exceeded）
+### 7-1. 認証エラー（Timeout exceeded waiting for page to load）
 
-**原因:** `.note-state.json` の認証情報が期限切れ
-
-**解決方法:**
-```bash
-node simple-login.js
+**エラー例:**
 ```
+TimeoutError: page.goto: Timeout 30000ms exceeded.
+```
+
+**原因の診断:**
+
+```bash
+# 認証状態ファイルの確認
+dir %USERPROFILE%\.note-state.json  # Windows
+ls -la ~/.note-state.json  # Mac/Linux
+
+# ファイルサイズが100バイト未満の場合、認証情報が無効
+```
+
+**解決方法（段階的）:**
+
+1. **認証状態の再取得**
+   ```bash
+   node simple-login.js
+   ```
+
+2. **ブラウザキャッシュのクリア**
+   - 手動でnote.comにログイン
+   - ブラウザを完全に閉じる
+   - 再度 `node simple-login.js` を実行
+
+3. **ネットワーク接続確認**
+   ```bash
+   curl -I https://note.com/login
+   # HTTP/2 200 が返れば正常
+   ```
+
+**期待される正常な動作:**
+- ブラウザが起動
+- note.comのログインページが3秒以内に表示
+- 手動ログイン後、「✅ 認証状態を保存しました！」と表示
 
 ### 7-2. Playwright ブラウザが見つからない
 
-**エラー:**
+**エラー例:**
 ```
-Executable doesn't exist at ...
+Error: Executable doesn't exist at C:\Users\YOUR_USERNAME\AppData\Local\ms-playwright\chromium-1234\chrome-win\chrome.exe
 ```
 
 **解決方法:**
+
 ```bash
+# Chromiumブラウザのインストール
 npx playwright install chromium
+
+# 確認
+node -e "require('playwright').chromium.executablePath().then(console.log)"
+# 実行可能ファイルのパスが表示されれば成功
 ```
 
-### 7-3. ファイルパスのエラー
+**期待される正常な動作:**
+- インストールに約1-2分かかる
+- 最後に「✔ chromium 109.0.5410.2 downloaded」と表示
 
-**エラー:**
+### 7-3. ファイルパスのエラー（ENOENT: no such file or directory）
+
+**エラー例:**
 ```
-Error: ENOENT: no such file or directory
+Error: ENOENT: no such file or directory, open 'C:/Users/YOUR_USERNAME/.note-state.json'
 ```
+
+**原因:**
+- パスが未編集（`YOUR_USERNAME` のまま）
+- ファイルが存在しない
+- パスの区切り文字が誤っている
+
+**解決方法（段階的診断）:**
+
+1. **パスの確認**
+   ```bash
+   # Windows
+   echo %USERPROFILE%
+   # 出力: C:\Users\YourName
+   
+   # Mac/Linux
+   echo $HOME
+   # 出力: /Users/YourName
+   ```
+
+2. **ファイル存在確認**
+   ```bash
+   # Windows
+   dir %USERPROFILE%\.note-state.json
+   
+   # Mac/Linux
+   ls -la ~/.note-state.json
+   ```
+
+3. **パス形式の確認**
+   - Windows: `C:/Users/YourName/...` （スラッシュ `/` を使用）
+   - ❌ 間違い: `C:\Users\YourName\...` （バックスラッシュは不可）
+   - Mac/Linux: `/Users/YourName/...` または `~/...`
+
+4. **スクリプトの実行**
+   - コマンドライン引数で正しいパスを指定
+   ```bash
+   node save-draft-final.js "C:/Users/ActualUserName/.note-state.json" "C:/Users/ActualUserName/Documents/note-post-mcp/actual-article.md"
+   ```
+
+**期待される正常な動作:**
+- エラーなくファイルが読み込まれる
+- 「タイトル: ...」「本文文字数: ...」と表示される
+
+### 7-4. セレクタが見つからない（Element not found）
+
+**エラー例:**
+```
+TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+  locator: locator('textarea[placeholder*="タイトル"]')
+```
+
+**原因:**
+- note.comのUI変更
+- ページ読み込みが遅い
+- AIダイアログが邪魔をしている
+
+**デバッグ手順:**
+
+1. **実際のHTML構造を確認**
+   - note.comをブラウザで開く
+   - F12 > Elements タブ
+   - タイトル入力欄を右クリック > 「検証」
+   - 実際の属性を確認
+
+2. **セレクタの更新**
+   - `save-draft-final.js` の該当行を修正
+   ```javascript
+   // 例: placeholderが変更された場合
+   const titleArea = page.locator('textarea[placeholder="記事タイトル"]');
+   ```
+
+3. **待機時間の延長**
+   ```javascript
+   await page.waitForTimeout(5000);  // 3000 → 5000に変更
+   ```
+
+**主要セレクタ一覧（2025年1月時点）**:
+| 要素 | セレクタ | 代替セレクタ |
+|------|---------|-------------|
+| タイトル | `textarea[placeholder*="タイトル"]` | `textarea[data-testid="title-input"]` |
+| 本文 | `div[contenteditable="true"][role="textbox"]` | `.editor-content` |
+| 下書き保存 | `button:has-text("下書き保存")` | `button[data-action="save-draft"]` |
+| 保存確認 | `text=保存しました` | `.toast-message` |
+| AIダイアログ閉じる | `button[aria-label*="閉じる"]` | `button.dialog-close` |
+
+**期待される正常な動作:**
+- タイトル入力欄が3秒以内に見つかる
+- 本文エディタが表示される
+- 下書き保存ボタンが有効になる
+
+### 7-5. 「保存しました」が表示されない
+
+**症状:**
+```
+⚠ 「保存しました」メッセージは表示されませんでしたが、処理は続行します
+```
+
+**これは警告であり、エラーではありません。**
+
+**確認方法:**
+1. 最終的に表示される「エディターURL」にアクセス
+2. note.comの「記事の管理」→「下書き」を確認
+
+**本当に保存されていない場合の原因:**
+- 本文が空
+- タイトルが空
+- ネットワークエラー
 
 **解決方法:**
-- スクリプト冒頭の `statePath` と `markdownPath` の定義を確認
-- または、コード内の `YOUR_USERNAME` と検索して該当箇所を特定
-- Windows の場合、パスのスラッシュは `/` を使用（`\` ではない）
-
-### 7-4. セレクタが見つからない
-
-**原因:** noteのUI変更
-
-**対処方法:**
-1. エラーメッセージを確認
-2. note.comのHTML構造を確認（F12 > Elements）
-3. セレクタを更新
-
-**主要セレクタ一覧**:
-| 要素 | セレクタ |
-|------|---------|
-| タイトル | `textarea[placeholder*="タイトル"]` |
-| 本文 | `div[contenteditable="true"][role="textbox"]` |
-| 下書き保存 | `button:has-text("下書き保存")` |
-| 保存確認 | `text=保存しました` |
+- スクリーンショット（`draft-saved-final.png`）を確認
+- エディターURLにアクセスして実際の状態を確認
 
 ## 8. セキュリティのベストプラクティス
 
-1. **認証情報の保護:**
-   - `.note-state.json` を `.gitignore` に追加
-   - パスワードをコードにハードコードしない
-   - パスワードは定期的に変更
+### 8-1. 認証情報の保護（必須）
 
-2. **アクセス権限:**
-   - `.note-state.json` のパーミッションを制限（Mac/Linux: `chmod 600 ~/.note-state.json`）
+**1. `.note-state.json` を `.gitignore` に追加**
 
-3. **バックアップ:**
-   - 重要な記事は下書き保存前にバックアップ
-   - スクリーンショットで動作を記録
+```bash
+# Windows PowerShell
+Add-Content -Path .gitignore -Value "`n.note-state.json"
+
+# Mac/Linux
+echo ".note-state.json" >> .gitignore
+```
+
+**2. ファイルパーミッションの制限**
+
+```bash
+# Mac/Linux のみ
+chmod 600 ~/.note-state.json
+
+# 確認
+ls -la ~/.note-state.json
+# 出力: -rw------- 1 user group ... .note-state.json
+```
+
+**3. パスワード管理**
+- コードにパスワードをハードコードしない
+- `.note-state.json` にはCookie/トークンのみ（パスワードは含まれない）
+- パスワードは3-6ヶ月ごとに変更推奨
+
+**4. 認証状態の定期更新**
+
+```bash
+# 7日ごとに再ログイン推奨
+node simple-login.js
+```
+
+### 8-2. バックアップと記録（推奨）
+
+**1. 記事のバックアップ**
+
+```bash
+# Windows
+copy "C:\Users\YOUR_USERNAME\Documents\note-post-mcp\YOUR_ARTICLE.md" "C:\Users\YOUR_USERNAME\Documents\note-post-mcp\backups\YOUR_ARTICLE_$(Get-Date -Format 'yyyyMMdd').md"
+
+# Mac/Linux
+cp ~/Documents/note-post-mcp/YOUR_ARTICLE.md ~/Documents/note-post-mcp/backups/YOUR_ARTICLE_$(date +%Y%m%d).md
+```
+
+**2. スクリーンショットの保存**
+- `draft-saved-final.png` を日付付きで保存
+- エラー時の `draft-error-final.png` も保管
+
+**3. 実行ログの記録**
+
+```bash
+node save-draft-final.js 2>&1 | tee execution_log_$(date +%Y%m%d_%H%M%S).txt
+```
+
+### 8-3. GitHub等への公開時の注意
+
+**絶対に公開してはいけないファイル:**
+- `.note-state.json` （認証情報）
+- `draft-*.png` （プライベートな記事内容）
+- 実行ログ（ファイルパスが含まれる）
+
+**`.gitignore` の推奨設定:**
+```
+.note-state.json
+draft-*.png
+execution_log_*.txt
+*.log
+```
 
 ## 9. 自動化フロー全体図
 
