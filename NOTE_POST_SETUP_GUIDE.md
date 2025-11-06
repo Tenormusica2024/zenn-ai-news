@@ -112,6 +112,45 @@ await browser.close();
 node simple-login.js
 ```
 
+**📊 認証状態取得フロー図解:**
+
+```
+┌──────────────────┐
+│ simple-login.js  │
+│ 実行             │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ Chromiumブラウザ │
+│ 起動             │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ note.com/login   │
+│ ページ表示       │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ 手動ログイン     │
+│ （メール・PW）   │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ ログイン完了     │
+│ ブラウザ閉じる   │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ Cookie/トークン  │
+│ 自動保存         │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ .note-state.json │
+│ （ホーム直下）   │
+└──────────────────┘
+```
+
 実行後：
 1. ブラウザが自動的に開く
 2. note.comのログインページが表示される
@@ -145,6 +184,35 @@ ls ~/.note-state.json
 - タグ（note.comの画面で直接入力）
 - カバー画像
 - 公開設定
+
+**📊 Front matter変換 - ビフォー・アフター図解:**
+
+```
+┌─────────────────────────────────────────┐
+│ Zenn形式（変換前）                      │
+├─────────────────────────────────────────┤
+│ ---                                     │
+│ title: "記事タイトル"                 │
+│ emoji: "🤖"        ← 削除            │
+│ type: "tech"       ← 削除            │
+│ topics: ["AI"]     ← tags に変更     │
+│ published: false   ← 削除            │
+│ ---                                     │
+│ 本文...                                 │
+└─────────────────────────────────────────┘
+           ↓ 変換処理
+┌─────────────────────────────────────────┐
+│ note.com形式（変換後）                  │
+├─────────────────────────────────────────┤
+│ ---                                     │
+│ title: "記事タイトル"                 │
+│ tags:              ← 配列形式に変更   │
+│   - AI                                  │
+│   - エージェント                        │
+│ ---                                     │
+│ 本文...                                 │
+└─────────────────────────────────────────┘
+```
 
 **変換前（Zenn形式）:**
 ```markdown
@@ -582,6 +650,61 @@ claude mcp list
 note-post-mcp  npx @gonuts555/note-post-mcp@latest
 ```
 
+### 6-4. MCP Server経由での使用（Claude Code）
+
+**MCPツールとして使用する場合:**
+
+Claude Code内で以下のようにツールを呼び出します：
+
+```javascript
+// Claude Code内で実行（MCP Tool経由）
+mcp__note_post_mcp__save_draft({
+  markdown_path: "C:/Users/YourName/Documents/note-post-mcp/article.md",
+  state_path: "C:/Users/YourName/.note-state.json",
+  screenshot_dir: "C:/Users/YourName/Documents/note-post-mcp",
+  timeout: 180000  // 3分（デフォルト）
+})
+```
+
+**パラメータ:**
+- `markdown_path` (必須): 投稿する記事ファイルのパス
+- `state_path` (オプション): 認証状態ファイルのパス（環境変数から取得可能）
+- `screenshot_dir` (オプション): スクリーンショット保存先（デフォルト: 記事と同じディレクトリ）
+- `timeout` (オプション): タイムアウト時間（ミリ秒、デフォルト: 180000 = 3分）
+
+**実行例:**
+
+```javascript
+// 最小限の指定（環境変数を使用）
+mcp__note_post_mcp__save_draft({
+  markdown_path: "C:/Users/YourName/Documents/note-post-mcp/my-article.md"
+})
+
+// 全パラメータ指定
+mcp__note_post_mcp__save_draft({
+  markdown_path: "C:/Users/YourName/Documents/note-post-mcp/my-article.md",
+  state_path: "C:/Users/YourName/.note-state.json",
+  screenshot_dir: "C:/Users/YourName/Documents/screenshots",
+  timeout: 300000  // 5分
+})
+```
+
+**実行結果:**
+
+成功時：
+```
+✅ 下書き保存完了
+エディターURL: https://editor.note.com/notes/n93618151dd62/edit/
+スクリーンショット: C:/Users/YourName/Documents/note-post-mcp/draft-saved-final.png
+```
+
+エラー時：
+```
+❌ エラーが発生しました: Timeout 30000ms exceeded
+スクリーンショット: C:/Users/YourName/Documents/note-post-mcp/draft-error-final.png
+詳細: トラブルシューティングセクション7-1を参照
+```
+
 ## 7. トラブルシューティング（エラーパターン別詳細対処法）
 
 ### 7-1. 認証エラー（Timeout exceeded waiting for page to load）
@@ -840,21 +963,55 @@ execution_log_*.txt
 
 ## 9. 自動化フロー全体図
 
+```mermaid
+flowchart TD
+    A[Zenn記事作成] --> B{認証状態<br/>ファイル<br/>存在?}
+    B -->|なし| C[simple-login.js実行]
+    C --> D[ブラウザ起動]
+    D --> E[note.comログイン<br/>手動]
+    E --> F[認証状態保存<br/>.note-state.json]
+    B -->|あり| G{記事形式<br/>確認}
+    F --> G
+    G -->|Zenn形式| H[Front matter変換<br/>tags形式へ]
+    G -->|note形式| I[save-draft-final.js実行]
+    H --> I
+    I --> J[パス設定確認]
+    J --> K{パス<br/>設定済み?}
+    K -->|未設定| L[エラー表示<br/>--helpで確認]
+    K -->|設定済み| M[ブラウザ起動<br/>認証状態ロード]
+    M --> N[エディター<br/>ページアクセス]
+    N --> O[タイトル入力]
+    O --> P[本文入力]
+    P --> Q[下書き保存<br/>ボタンクリック]
+    Q --> R[スクリーンショット<br/>撮影]
+    R --> S{保存<br/>成功?}
+    S -->|成功| T[エディターURL表示]
+    S -->|失敗| U[エラー<br/>スクリーンショット]
+    T --> V[ブラウザで<br/>下書き確認]
+    U --> W[トラブル<br/>シューティング]
+    L --> J
+    W --> X{問題<br/>解決?}
+    X -->|解決| I
+    X -->|未解決| Y[認証状態再取得]
+    Y --> C
+    
+    style A fill:#e1f5ff
+    style F fill:#c8e6c9
+    style H fill:#fff9c4
+    style T fill:#c8e6c9
+    style U fill:#ffcdd2
+    style V fill:#c8e6c9
 ```
-1. Zenn記事作成
-   ↓
-2. simple-login.js で認証状態取得（初回のみ）
-   ↓
-3. 手動でZenn記事をnote.com形式に変換
-   ↓
-4. save-draft-final.js のパスを編集
-   ↓
-5. save-draft-final.js で下書き保存
-   ↓
-6. 保存成功確認（スクリーンショット・エディターURL）
-   ↓
-7. ブラウザで下書き確認
-```
+
+**フロー説明:**
+
+1. **Zenn記事作成**: Zenn記事を作成
+2. **認証状態確認**: `.note-state.json` が存在するか確認
+3. **初回ログイン**: 存在しない場合は `simple-login.js` で認証状態取得
+4. **記事形式変換**: Zenn形式の場合は `tags` 形式に変換
+5. **下書き保存**: `save-draft-final.js` で自動保存
+6. **エラーハンドリング**: 失敗時はトラブルシューティング実施
+7. **確認**: ブラウザで下書き内容を最終確認
 
 ## 10. 参考情報
 
