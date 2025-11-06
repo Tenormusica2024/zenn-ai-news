@@ -135,6 +135,17 @@ ls ~/.note-state.json
 
 ### 3-2. note.com形式への変換
 
+**⚠️ 重要**: 現在のスクリプトは**タイトルと本文のみ**を自動入力します。
+
+**自動入力される項目:**
+- タイトル
+- 本文
+
+**手動入力が必要な項目:**
+- タグ（note.comの画面で直接入力）
+- カバー画像
+- 公開設定
+
 **変換前（Zenn形式）:**
 ```markdown
 ---
@@ -172,7 +183,13 @@ tags:
 
 ### 4-1. 下書き保存スクリプト（save-draft-final.js）
 
-実際に動作する`save-draft-final.js`のコード：
+**🚨 セキュリティ警告: このコードをコピーする前に必ずお読みください**
+- 以下のコードには `YOUR_USERNAME` などのプレースホルダーが含まれています
+- **そのままコピペして実行すると失敗します**
+- 必ず自分の環境に合わせてパスを修正してください
+- 認証情報（`.note-state.json`）は絶対にGitにコミットしないでください
+
+実際の環境で動作確認済みの`save-draft-final.js`のコード例（ただし、パス編集が必須です）：
 
 ```javascript
 import { chromium } from 'playwright';
@@ -311,15 +328,27 @@ await browser.close();
 
 **⚠️ 重要**: 上記のサンプルコードは既にプレースホルダー（`YOUR_USERNAME`, `YOUR_ARTICLE.md`）を使用しています。実際に使用する前に、これらを自分の環境に合わせて変更してください：
 
-1. **認証状態ファイルのパス**（172行目）:
-   - `YOUR_USERNAME` → あなたのWindowsユーザー名
+**OS別のパス設定例:**
 
-2. **Markdownファイルのパス**（173行目）:
-   - `YOUR_USERNAME` → あなたのWindowsユーザー名
-   - `YOUR_ARTICLE.md` → 実際の記事ファイル名
+**Windows:**
+```javascript
+const statePath = 'C:/Users/YOUR_USERNAME/.note-state.json';
+const markdownPath = 'C:/Users/YOUR_USERNAME/Documents/note-post-mcp/YOUR_ARTICLE.md';
+```
+- `YOUR_USERNAME` → あなたのWindowsユーザー名
+- `YOUR_ARTICLE.md` → 実際の記事ファイル名
 
-3. **スクリーンショット保存先**（285行目、294行目）:
-   - `YOUR_USERNAME` → あなたのWindowsユーザー名
+**Mac/Linux:**
+```javascript
+const statePath = `${process.env.HOME}/.note-state.json`;
+const markdownPath = `${process.env.HOME}/Documents/note-post-mcp/YOUR_ARTICLE.md`;
+```
+- `YOUR_ARTICLE.md` → 実際の記事ファイル名
+
+**スクリーンショット保存先**（295行目、304行目）:
+- デフォルト: `C:/Users/YOUR_USERNAME/Documents/note-post-mcp/`
+- **このディレクトリが存在しない場合、スクリプトは失敗します**
+- 事前に作成するか、既存のディレクトリに変更してください
 
 ### 4-3. 下書き保存の実行
 
@@ -427,7 +456,8 @@ Error: ENOENT: no such file or directory
 ```
 
 **解決方法:**
-- `save-draft-final.js` の5行目と6行目のパスを確認
+- `save-draft-final.js` の182行目と183行目のパスを確認
+- または、コード内の `YOUR_USERNAME` と検索して該当箇所を特定
 - Windows の場合、パスのスラッシュは `/` を使用（`\` ではない）
 
 ### 7-4. セレクタが見つからない
