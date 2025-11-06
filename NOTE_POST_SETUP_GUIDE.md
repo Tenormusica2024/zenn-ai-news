@@ -183,11 +183,24 @@ tags:
 
 ### 4-1. 下書き保存スクリプト（save-draft-final.js）
 
-**🚨 セキュリティ警告: このコードをコピーする前に必ずお読みください**
-- 以下のコードには `YOUR_USERNAME` などのプレースホルダーが含まれています
-- **そのままコピペして実行すると失敗します**
-- 必ず自分の環境に合わせてパスを修正してください
-- 認証情報（`.note-state.json`）は絶対にGitにコミットしないでください
+---
+## ⚠️⚠️⚠️ 🚨 CRITICAL SECURITY WARNING 🚨 ⚠️⚠️⚠️
+
+**以下のコードをコピーする前に必ずお読みください:**
+
+1. **プレースホルダーの置き換えが必須です**
+   - `YOUR_USERNAME` → あなたの実際のユーザー名
+   - `YOUR_ARTICLE.md` → あなたの実際のファイル名
+   
+2. **そのままコピペすると100%失敗します**
+   - ファイルが見つからないエラーが発生します
+   - 認証情報が読み込めずタイムアウトします
+
+3. **認証情報は絶対にGitにコミットしないでください**
+   - `.note-state.json` を `.gitignore` に追加
+   - パスワードをコードにハードコードしない
+
+---
 
 実際の環境で動作確認済みの`save-draft-final.js`のコード例（ただし、パス編集が必須です）：
 
@@ -345,12 +358,50 @@ const markdownPath = `${process.env.HOME}/Documents/note-post-mcp/YOUR_ARTICLE.m
 ```
 - `YOUR_ARTICLE.md` → 実際の記事ファイル名
 
-**スクリーンショット保存先**（295行目、304行目）:
-- デフォルト: `C:/Users/YOUR_USERNAME/Documents/note-post-mcp/`
-- **このディレクトリが存在しない場合、スクリプトは失敗します**
+**スクリーンショット保存先**（スクリプト内の2箇所）:
+- **成功時**: `draft-saved-final.png`
+- **エラー時**: `draft-error-final.png`
+- **保存先ディレクトリ**: `C:/Users/YOUR_USERNAME/Documents/note-post-mcp/`
+- **⚠️ 重要**: このディレクトリが存在しない場合、スクリプトは失敗します
 - 事前に作成するか、既存のディレクトリに変更してください
 
-### 4-3. 下書き保存の実行
+### 4-3. 実行前の確認チェックリスト
+
+**必ず確認してください（チェックが全て✓になるまで実行しないでください）:**
+
+- [ ] `.note-state.json` が存在する
+  ```bash
+  # Windows
+  dir %USERPROFILE%\.note-state.json
+  # Mac/Linux
+  ls ~/.note-state.json
+  ```
+
+- [ ] 記事ファイルが存在する
+  ```bash
+  # Windows
+  dir "C:\Users\YOUR_USERNAME\Documents\note-post-mcp\YOUR_ARTICLE.md"
+  # Mac/Linux
+  ls ~/Documents/note-post-mcp/YOUR_ARTICLE.md
+  ```
+
+- [ ] スクリーンショット保存先ディレクトリが存在する
+  ```bash
+  # Windows
+  dir "C:\Users\YOUR_USERNAME\Documents\note-post-mcp"
+  # Mac/Linux
+  ls ~/Documents/note-post-mcp
+  ```
+
+- [ ] `save-draft-final.js` のパスを編集済み
+  - `YOUR_USERNAME` を実際のユーザー名に置き換え
+  - `YOUR_ARTICLE.md` を実際のファイル名に置き換え
+
+- [ ] note.comの認証状態が有効（7日以内にログイン）
+
+**全てのチェックが完了したら、次のステップに進んでください。**
+
+### 4-4. 下書き保存の実行
 
 ```bash
 node save-draft-final.js
@@ -456,7 +507,7 @@ Error: ENOENT: no such file or directory
 ```
 
 **解決方法:**
-- `save-draft-final.js` の199行目と200行目のパスを確認
+- スクリプト冒頭の `statePath` と `markdownPath` の定義を確認
 - または、コード内の `YOUR_USERNAME` と検索して該当箇所を特定
 - Windows の場合、パスのスラッシュは `/` を使用（`\` ではない）
 
