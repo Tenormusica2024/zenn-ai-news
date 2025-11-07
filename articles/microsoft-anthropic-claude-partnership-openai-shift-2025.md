@@ -1,0 +1,67 @@
+---
+title: "MicrosoftがCopilotにClaude採用 - OpenAI一強時代の終わり"
+emoji: "🔄"
+type: "tech"
+topics: ["AI", "Microsoft", "Anthropic", "OpenAI", "Claude"]
+published: false
+---
+
+## 参照元
+Microsoft adds Anthropic's Claude AI models to 365 Copilot as OpenAI relationship evolves - GeekWire
+https://www.geekwire.com/2025/microsoft-adds-anthropics-claude-ai-models-to-365-copilot-as-openai-relationship-evolves/
+
+## Microsoft 365 CopilotにClaudeが統合
+
+2025年9月末、MicrosoftがCopilot StudioにAnthropicのClaude Sonnet 4.5を追加すると発表しました。これまでOpenAI一択だったMicrosoft 365 Copilotに、Anthropicのモデルが選択肢として加わったことになります。
+
+今まではMicrosoftのAI製品といえば、事実上OpenAI製と同義でした。しかし今回の発表で、企業ユーザーはタスクごとにOpenAIとAnthropicを使い分けられるようになります。Copilot StudioではClaude Sonnet 4、Claude Opus 4.1、そしてAzure Model Catalogの他のモデルも混在させて使える環境になりました。
+
+技術的に興味深いのは、マルチエージェントシステムとプロンプトツールで、タスクごとに異なるモデルを使い分けられる点です。たとえば一部のタスクだけClaudeに任せて、他はOpenAIのまま、という柔軟な構成が可能になっています。
+
+## 31億ドルの損失が示すパートナーシップの限界
+
+実はこの発表の裏側で、MicrosoftとOpenAIの関係にはかなり大きな亀裂が入っています。2025年第1四半期、MicrosoftはOpenAI投資から31億ドルの損失を計上しました。OpenAIが1300億ドル規模の再編を進めた影響で、Microsoftの独占的アクセス権が希薄化したためです。
+
+Microsoft幹部の一人は「金と計算資源を出すから、後は口出しするな」というOpenAIの態度に不満を漏らしたと報じられています。130億ドル投資してきた結果、MicrosoftはOpenAIを検索とAI分野での「直接の競合」としてリストアップする状況になっています。
+
+契約面でも8ヶ月以上にわたって所有権、利益分配、独占性について交渉が続いており、OpenAI側はMicrosoftの出資比率を33%に抑えたいと主張しています。さらにOpenAIがCoreweaveに224億ドル、Googleにサーバーレンタル契約を結ぶなど、計算資源の調達先を多様化しており、Azure優先の関係は崩れつつあります。
+
+## Anthropicの企業市場での急成長
+
+一方、Anthropicは企業市場で驚異的な成長を遂げています。2025年8月時点でClaude Sonnet 4は企業向けLLM市場シェア32%を獲得し、OpenAIの25%、Googleの20%を上回りました。わずか1年前はOpenAIが50%のシェアを持っていたことを考えると、かなり急激な逆転です。
+
+Anthropicの年間経常収益は2024年初頭の8700万ドルから、2025年8月には50億ドル超へと成長しました。特にコード生成分野では42%という圧倒的なシェアを持っており、最も近いライバルの2倍です。Claude Codeは発表から2ヶ月で年間5億ドルの収益を生み出し、Anthropicはこれを「史上最速成長プロダクト」と主張しています。
+
+企業向けの大規模導入実績も目立ちます。Deloitteが全世界47万人の従業員に展開したのがこれまで最大規模で、Cognizantも35万人への導入を計画中です。2025年には国際部門の人員を3倍、応用AI部門を5倍に拡大するとも発表しています。
+
+## Microsoftの製品責任者がClaude優位と判断
+
+興味深いことに、Microsoftの製品責任者たちはClaude Sonnet 4がOpenAIのモデルを「subtle but important」な点で上回ると評価したそうです。具体的には「より洗練されたスライドを生成する」といった部分で差が出ているとのこと。
+
+前にプレゼン資料生成AIを試したときは、構成は悪くないけど細かいデザインやトーンの調整が手間で、結局人力で直すことになった経験があります。「より洗練された」という評価がどの程度のものか、実際の出力を見てみたい気はします。
+
+ただ、Microsoftとしては全面的にClaude一本にするわけではなく、OpenAIをデフォルトモデルとして維持しつつ、選択肢を増やす方針のようです。リスク分散という意味では妥当な戦略かもしれません。
+
+## 契約交渉の行き詰まりと独占禁止法リスク
+
+MicrosoftとOpenAIの契約交渉は非常に難航しています。OpenAIが30億ドルで買収したAIコーディングスタートアップWindsurfの知的財産権をめぐっても対立しており、OpenAIはMicrosoftへの権利移転を拒んでいます。
+
+さらにOpenAI側は「Microsoftが独占禁止法に違反している」として規制当局への告発も検討しているとの報道があります。いわゆる「核オプション」と呼ばれる最終手段ですが、ここまで関係が悪化しているとすれば、今後のパートナーシップ継続は相当厳しいでしょう。
+
+OpenAI CEOのサム・アルトマンとMicrosoft CEOのサティア・ナデラは個別に電話会談を行い、今後の提携について議論したようですが、具体的な進展は報じられていません。Microsoftの幹部からは「OpenAIは態度が悪い」という不満が漏れ、OpenAI側からは「Microsoftが囲い込もうとしている」という反発が出ています。
+
+## 130億ドル投資した競合を育てた皮肉
+
+結果的に、MicrosoftはOpenAIに130億ドル投資して、1300億ドルの評価額を持つ直接の競合を育て上げたことになります。OpenAIは検索市場でBingと競合し、AI製品市場でCopilotと競合し、さらにCompute資源の調達先をAzure以外にも拡大しています。
+
+企業向けAI市場でAnthropicが急成長している今、MicrosoftがClaude統合に動いたのは当然の流れかもしれません。しかしOpenAIとの関係修復が難しい以上、Microsoftは自社のAI戦略を根本的に見直す必要がありそうです。
+
+今後、Microsoftが独自のLLMモデル開発に注力するのか、Anthropicとの提携を深めるのか、それとも複数のモデルプロバイダーを使い分けるハイブリッド戦略を取るのか。AIエンジニアとして間接的に影響を受ける可能性がある以上、今後の主要IT企業の行く末を注視していきたいところです。
+
+## パートナーシップの未来は不透明
+
+Microsoft-OpenAI関係の悪化は、AI業界全体の構図に影響を及ぼしそうです。Anthropicの台頭、Googleの巻き返し、Meta等の新興勢力も含めて、企業向けAI市場は混戦状態に入っています。
+
+数ヶ月前まで「MicrosoftとOpenAIのタッグが最強」というのが業界の共通認識でしたが、今やその前提が崩れつつあります。企業がAIプロバイダーを選ぶ際、単一ベンダーに依存するリスクを強く意識するようになるかもしれません。
+
+実際、マルチモデル戦略を取る企業が増えているという報道もあります。OpenAI一本、Claude一本という選択ではなく、タスクごとに使い分ける柔軟な構成が主流になる可能性があります。Microsoft自身がその方向に舵を切ったことは、業界のトレンドを象徴しているように感じます。
