@@ -76,11 +76,12 @@ function splitIntoChunks(text, maxLength = 1000) {
 }
 
 // HTTP リクエストヘルパー（タイムアウト・リトライ対応）
-// タイムアウト: 30000ms (30秒) - VOICEVOX音声合成API実測値
-//   - 1000文字チャンクの音声生成: 平均10-15秒
+// タイムアウト: 30000ms (30秒) - 推定値（実測未実施）
+//   - 1000文字チャンクの音声生成: 推定10-15秒
 //   - ネットワーク遅延を考慮: +15秒のマージン
-// リトライ: 3回 - API一時的エラーをカバー（実測で2回以内に成功）
-// 指数バックオフ: 1秒 → 2秒 → 3秒（API負荷軽減）
+// リトライ: 3回 - 一般的なAPI設定値（実測による最適化未実施）
+// 指数バックオフ: 1秒 → 2秒 → 3秒（API負荷軽減のための推奨設定）
+// TODO: 実際の環境で実測して最適化（N>=100のテストケースで検証）
 async function httpRequest(url, options = {}, binary = false, timeout = 30000, retries = 3) {
   let lastError = null;
   
@@ -114,7 +115,6 @@ async function httpRequest(url, options = {}, binary = false, timeout = 30000, r
             cleanup();
             
             // 2xx系ステータスコードを成功として扱う
-            // 200 OK, 201 Created, 202 Accepted, 204 No Content等を許容
             if (res.statusCode < 200 || res.statusCode >= 300) {
               reject(new Error(`HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString()}`));
               return;
@@ -174,9 +174,9 @@ async function textToSpeech(text, speakerId) {
     console.error(`音声変換エラー: ${error.message}`);
     console.error('VOICEVOX APIサーバーが起動しているか確認してください');
     console.error('\n確認方法（いずれか1つを実行）:');
-    console.error('  Windows PowerShell: Invoke-WebRequest -Uri http://localhost:50021/version');
-    console.error('  コマンドプロンプト: curl http://localhost:50021/version');
     console.error('  ブラウザ: http://localhost:50021/version にアクセス');
+    console.error('  コマンドライン（全OS共通）: curl http://localhost:50021/version');
+    console.error('  Windows PowerShell: Invoke-WebRequest -Uri http://localhost:50021/version');
     throw error;
   }
 }
@@ -240,9 +240,9 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
     console.error('2. 設定 → エンジン → 「HTTPサーバーを起動する」がONか');
     console.error('3. ポート番号が50021か');
     console.error('\n確認方法（いずれか1つを実行）:');
-    console.error('  Windows PowerShell: Invoke-WebRequest -Uri http://localhost:50021/version');
-    console.error('  コマンドプロンプト: curl http://localhost:50021/version');
-    console.error('  ブラウザ: http://localhost:50021/version にアクセス\n');
+    console.error('  ブラウザ: http://localhost:50021/version にアクセス');
+    console.error('  コマンドライン（全OS共通）: curl http://localhost:50021/version');
+    console.error('  Windows PowerShell: Invoke-WebRequest -Uri http://localhost:50021/version\n');
     throw new Error('VOICEVOX API server is not running');
   }
   
@@ -267,10 +267,10 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
       audioBuffers.push(audioData);
       
       // API負荷軽減のため少し待機
-      // 100ms - VOICEVOX API実測値: 連続リクエスト間隔の最小推奨値
-      //   - 0ms: APIエラー率 5-10%
-      //   - 100ms: APIエラー率 < 1%
-      //   - 200ms: 改善効果なし（無駄な待機）
+      // 100ms - 推定値（実測未実施）
+      // TODO: 実際の環境で最適待機時間を測定（N>=100）
+      //   - 0ms, 50ms, 100ms, 200msでのAPIエラー率比較
+      //   - 実測データに基づいて最適値を決定
       await new Promise(resolve => setTimeout(resolve, 100));
     } catch (error) {
       console.error(`⚠️  チャンク ${i + 1} の音声生成失敗: ${error.message}`);
