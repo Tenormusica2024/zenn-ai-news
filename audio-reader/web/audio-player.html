@@ -360,9 +360,8 @@
       <div class="voice-control">
         <label for="voiceSelect">ナレーター:</label>
         <select id="voiceSelect">
-          <option value="no7-reading" selected>No.7（読み聞かせ）</option>
-          <option value="aoyama-calm">青山龍星（しっとり）</option>
-          <option value="zundamon">ずんだもん（ノーマル）</option>
+          <option value="ja-normal" selected>Google翻訳音声（標準）</option>
+          <option value="zundamon">VOICEVOX ずんだもん</option>
         </select>
       </div>
     </div>
@@ -391,7 +390,7 @@
     
     let playlist = null;
     let currentChunkIndex = 0;
-    let currentVoice = 'no7-reading';
+    let currentVoice = 'ja-normal';
     const audioBasePath = '../audio/affinity-3-free-canva-ai-strategy-2025/';
     
     // プレイリスト読み込み
@@ -439,7 +438,9 @@
       if (index < 0 || index >= playlist.totalChunks) return;
       
       currentChunkIndex = index;
-      const filename = `article_${currentVoice}.wav`;
+      // gTTSはMP3、VOICEVOXはWAV
+      const extension = currentVoice === 'ja-normal' ? 'mp3' : 'wav';
+      const filename = `article_${currentVoice}.${extension}`;
       audio.src = audioBasePath + filename;
       updateChunkInfo();
       updateButtons();

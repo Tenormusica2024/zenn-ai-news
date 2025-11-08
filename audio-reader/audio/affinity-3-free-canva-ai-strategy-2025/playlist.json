@@ -1,9 +1,11 @@
 {
   "article": "affinity-3-free-canva-ai-strategy-2025.md",
+  "speaker": "ja-normal",
+  "speakerName": "日本語（標準）",
   "chunks": [
-    "article.wav"
+    "article_ja-normal.mp3"
   ],
   "totalChunks": 1,
-  "createdAt": "2025-11-08T07:07:22.762Z",
-  "updatedAt": "2025-11-08T07:41:38.792Z"
+  "engine": "gTTS",
+  "createdAt": "2025-11-08T19:53:29.908580"
 }
