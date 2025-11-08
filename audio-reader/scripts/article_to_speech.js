@@ -7,6 +7,17 @@ const http = require('http');
 
 const VOICEVOX_API = 'http://localhost:50021';
 
+// 設定値（実測による最適化推奨）
+const CONFIG = {
+  CHUNK_SIZE: 1000,              // チャンク分割サイズ（文字数）
+  HTTP_TIMEOUT: 30000,           // HTTPタイムアウト（ミリ秒）
+  HTTP_RETRIES: 3,               // HTTPリトライ回数
+  BACKOFF_BASE: 1000,            // リトライ待機時間（ミリ秒）
+  API_WAIT: 100,                 // API連続呼び出し間隔（ミリ秒）
+  CIRCUIT_BREAKER_THRESHOLD: 3,  // 連続失敗でサーキットブレーカー発動
+  WAV_HEADER_SIZE: 44            // WAVヘッダーサイズ（バイト）
+};
+
 // 利用可能な話者リスト
 const AVAILABLE_SPEAKERS = {
   'zundamon': { id: 3, name: 'ずんだもん（ノーマル）', description: '親しみやすい声' },
@@ -51,8 +62,8 @@ function extractTextFromMarkdown(markdown) {
   return text.trim();
 }
 
-// 長文をVOICEVOXのAPI制限に合わせて分割（1000文字程度）
-function splitIntoChunks(text, maxLength = 1000) {
+// 長文をVOICEVOXのAPI制限に合わせて分割
+function splitIntoChunks(text, maxLength = CONFIG.CHUNK_SIZE) {
   const sentences = text.split(/[。\n]/);
   const chunks = [];
   let currentChunk = '';
@@ -76,13 +87,8 @@ function splitIntoChunks(text, maxLength = 1000) {
 }
 
 // HTTP リクエストヘルパー（タイムアウト・リトライ対応）
-// タイムアウト: 30000ms (30秒) - 推定値（実測未実施）
-//   - 1000文字チャンクの音声生成: 推定10-15秒
-//   - ネットワーク遅延を考慮: +15秒のマージン
-// リトライ: 3回 - 一般的なAPI設定値（実測による最適化未実施）
-// 指数バックオフ: 1秒 → 2秒 → 3秒（API負荷軽減のための推奨設定）
-// TODO: 実際の環境で実測して最適化（N>=100のテストケースで検証）
-async function httpRequest(url, options = {}, binary = false, timeout = 30000, retries = 3) {
+// 設定値はCONFIG定数で管理（推定値、実測による最適化推奨）
+async function httpRequest(url, options = {}, binary = false, timeout = CONFIG.HTTP_TIMEOUT, retries = CONFIG.HTTP_RETRIES) {
   let lastError = null;
   
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -116,7 +122,8 @@ async function httpRequest(url, options = {}, binary = false, timeout = 30000, r
             
             // 2xx系ステータスコードを成功として扱う
             if (res.statusCode < 200 || res.statusCode >= 300) {
-              reject(new Error(`HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString()}`));
+              const errorBody = Buffer.concat(chunks).toString();
+              reject(new Error(`HTTP ${res.statusCode} [${options.method || 'GET'} ${url}]: ${errorBody}`));
               return;
             }
             
@@ -144,12 +151,21 @@ async function httpRequest(url, options = {}, binary = false, timeout = 30000, r
       lastError = error;
       if (attempt < retries) {
         console.log(`リトライ ${attempt}/${retries}: ${error.message}`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        await new Promise(resolve => setTimeout(resolve, CONFIG.BACKOFF_BASE * attempt));
       }
     }
   }
   
   throw new Error(`Failed after ${retries} attempts: ${lastError.message}`);
+}
+
+// VOICEVOX接続エラーメッセージ表示
+function printVoicevoxConnectionError() {
+  console.error('VOICEVOX APIサーバーが起動しているか確認してください');
+  console.error('\n確認方法（いずれか1つを実行）:');
+  console.error('  ブラウザ: http://localhost:50021/version にアクセス');
+  console.error('  コマンドライン（全OS共通）: curl http://localhost:50021/version');
+  console.error('  Windows PowerShell: Invoke-WebRequest -Uri http://localhost:50021/version');
 }
 
 // テキストを音声に変換
@@ -172,11 +188,7 @@ async function textToSpeech(text, speakerId) {
     return audioData;
   } catch (error) {
     console.error(`音声変換エラー: ${error.message}`);
-    console.error('VOICEVOX APIサーバーが起動しているか確認してください');
-    console.error('\n確認方法（いずれか1つを実行）:');
-    console.error('  ブラウザ: http://localhost:50021/version にアクセス');
-    console.error('  コマンドライン（全OS共通）: curl http://localhost:50021/version');
-    console.error('  Windows PowerShell: Invoke-WebRequest -Uri http://localhost:50021/version');
+    printVoicevoxConnectionError();
     throw error;
   }
 }
@@ -192,22 +204,25 @@ function concatenateWavBuffers(buffers) {
     throw new Error('WAV結合エラー: 不正なバッファ型');
   }
   
-  if (buffers.some(buf => buf.length < 44)) {
-    throw new Error('WAV結合エラー: WAVヘッダーサイズ不足（44バイト未満）');
+  if (buffers.some(buf => buf.length < CONFIG.WAV_HEADER_SIZE)) {
+    throw new Error(`WAV結合エラー: WAVヘッダーサイズ不足（${CONFIG.WAV_HEADER_SIZE}バイト未満）`);
   }
   
-  // WAVファイルの"RIFF"ヘッダー確認
+  // 全バッファのRIFFヘッダー検証（データ破損の早期発見）
+  buffers.forEach((buf, index) => {
+    const riffHeader = buf.toString('ascii', 0, 4);
+    if (riffHeader !== 'RIFF') {
+      throw new Error(`WAV結合エラー: バッファ${index + 1}の不正なRIFFヘッダー（${riffHeader}）`);
+    }
+  });
+  
   const firstBuffer = buffers[0];
-  const riffHeader = firstBuffer.toString('ascii', 0, 4);
-  if (riffHeader !== 'RIFF') {
-    throw new Error(`WAV結合エラー: 不正なRIFFヘッダー（${riffHeader}）`);
-  }
   
   // 最初のWAVヘッダーを取得
-  const firstHeader = firstBuffer.slice(0, 44);
+  const firstHeader = firstBuffer.slice(0, CONFIG.WAV_HEADER_SIZE);
   
   // 全データ部分を結合
-  const dataChunks = buffers.map(buf => buf.slice(44));
+  const dataChunks = buffers.map(buf => buf.slice(CONFIG.WAV_HEADER_SIZE));
   const totalDataSize = dataChunks.reduce((sum, chunk) => sum + chunk.length, 0);
   
   // 32bit整数オーバーフロー確認
@@ -239,10 +254,8 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
     console.error('1. VOICEVOXアプリケーションが起動しているか');
     console.error('2. 設定 → エンジン → 「HTTPサーバーを起動する」がONか');
     console.error('3. ポート番号が50021か');
-    console.error('\n確認方法（いずれか1つを実行）:');
-    console.error('  ブラウザ: http://localhost:50021/version にアクセス');
-    console.error('  コマンドライン（全OS共通）: curl http://localhost:50021/version');
-    console.error('  Windows PowerShell: Invoke-WebRequest -Uri http://localhost:50021/version\n');
+    console.error('');
+    printVoicevoxConnectionError();
     throw new Error('VOICEVOX API server is not running');
   }
   
@@ -252,8 +265,8 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
   
   console.log(`抽出したテキスト長: ${text.length}文字`);
   
-  // VOICEVOX API制限対策で1000文字単位に分割
-  const chunks = splitIntoChunks(text, 1000);
+  // VOICEVOX API制限対策でCONFIG.CHUNK_SIZE単位に分割
+  const chunks = splitIntoChunks(text, CONFIG.CHUNK_SIZE);
   console.log(`${chunks.length}個のチャンクに分割して生成（最終的に1ファイルに結合）`);
   
   // 各チャンクを音声化してバッファに保存（エラー時は部分保存）
@@ -266,18 +279,14 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
       const audioData = await textToSpeech(chunks[i], speaker.id);
       audioBuffers.push(audioData);
       
-      // API負荷軽減のため少し待機
-      // 100ms - 推定値（実測未実施）
-      // TODO: 実際の環境で最適待機時間を測定（N>=100）
-      //   - 0ms, 50ms, 100ms, 200msでのAPIエラー率比較
-      //   - 実測データに基づいて最適値を決定
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // API負荷軽減のため少し待機（CONFIG.API_WAIT: 推定値、実測推奨）
+      await new Promise(resolve => setTimeout(resolve, CONFIG.API_WAIT));
     } catch (error) {
       console.error(`⚠️  チャンク ${i + 1} の音声生成失敗: ${error.message}`);
       failedChunks.push(i + 1);
       
-      // 3個以上連続で失敗した場合は中断
-      if (failedChunks.length >= 3) {
+      // CONFIG.CIRCUIT_BREAKER_THRESHOLD個以上連続で失敗した場合は中断
+      if (failedChunks.length >= CONFIG.CIRCUIT_BREAKER_THRESHOLD) {
         const lastThreeIndices = failedChunks.slice(-3);
         const isConsecutive = lastThreeIndices.every((val, idx) => {
           if (idx === 0) return true;
@@ -285,7 +294,7 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
         });
         
         if (isConsecutive) {
-          console.error('\n3個以上のチャンクが連続で失敗しました。処理を中断します。');
+          console.error(`\n${CONFIG.CIRCUIT_BREAKER_THRESHOLD}個以上のチャンクが連続で失敗しました。処理を中断します。`);
           if (audioBuffers.length > 0) {
             console.log(`\n部分的に生成された音声（${audioBuffers.length}チャンク）を保存します...`);
             break;
