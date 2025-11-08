@@ -170,11 +170,23 @@ pip install gTTS
 高品質音声が必要な場合のみ導入。
 
 ```bash
-# VOICEVOX公式サイトからダウンロード
+# 1. VOICEVOX公式サイトからダウンロード
 # https://voicevox.hiroshiba.jp/
 
-# インストール後、アプリケーション起動
-# APIサーバーが http://localhost:50021 で起動
+# 2. インストーラーを実行
+# - Windowsの場合: VOICEVOX-Windows-*.exe をダブルクリック
+# - Macの場合: VOICEVOX-Mac-*.dmg を開いてアプリケーションフォルダにドラッグ
+
+# 3. VOICEVOXアプリケーションを起動
+# - Windowsの場合: スタートメニュー → VOICEVOX
+# - Macの場合: アプリケーションフォルダ → VOICEVOX
+
+# 4. APIサーバー起動確認
+curl http://localhost:50021/version
+# 成功例: {"version":"0.24.1"}
+# 失敗例: curl: (7) Failed to connect to localhost port 50021
+
+# 注意: VOICEVOXアプリケーションを起動すると、自動的にAPIサーバーが http://localhost:50021 で起動します
 ```
 
 ### 4. Node.js依存関係（不要）
@@ -184,12 +196,20 @@ HTTPサーバーは標準ライブラリのみで動作するため、`npm insta
 ### 5. 動作確認
 
 ```bash
-# HTTPサーバー起動
+# 1. HTTPサーバー起動（このターミナルは起動したまま維持）
 node server.js
 # → Server running at http://localhost:8081/
 
-# ブラウザでアクセス
+# 2. ブラウザでアクセス（別タブまたは新しいウィンドウを開く）
+# http://localhost:8081/
+
+# または直接プレイヤーにアクセス
 # http://localhost:8081/web/audio-player.html
+
+# 注意: 
+# - サーバーを停止する場合は Ctrl+C を押す
+# - 音声ファイルが存在しない場合はエラーが表示されます
+# - 音声ファイル生成については「付録A」の「3. 音声生成テスト」を参照
 ```
 
 ---
@@ -214,12 +234,16 @@ audio-reader/
 │   └── affinity-thumbnail.jpg     # サムネイル画像
 │
 ├── venv_kokoro/                    # Python仮想環境
-│   ├── Lib/                        # Pythonライブラリ
-│   ├── Scripts/                    # 実行ファイル
-│   │   ├── python.exe
-│   │   ├── pip.exe
-│   │   └── activate.bat
-│   └── ...
+│   ├── Lib/                        # Pythonライブラリ（共通）
+│   ├── Scripts/                    # 実行ファイル（Windows）
+│   │   ├── python.exe              # Python実行ファイル
+│   │   ├── pip.exe                 # パッケージマネージャー
+│   │   ├── activate.bat            # 仮想環境有効化（バッチ）
+│   │   └── Activate.ps1            # 仮想環境有効化（PowerShell）
+│   └── bin/                        # 実行ファイル（Mac/Linux）
+│       ├── python                  # Python実行ファイル
+│       ├── pip                     # パッケージマネージャー
+│       └── activate                # 仮想環境有効化
 │
 ├── server.js                       # HTTPサーバー
 └── DESIGN_DOCUMENT.md              # 本ドキュメント
@@ -305,11 +329,21 @@ node article_to_speech.js ../articles/article.md zundamon
 ```
 
 **話者キー**:
-- `no7-reading`: No.7（読み聞かせ） - ID: 31（デフォルト、非推奨：処理重い）
-- `zundamon`: ずんだもん（ノーマル） - ID: 3（推奨：軽量）
-- `aoyama-calm`: 青山龍星（しっとり） - ID: 84（非推奨：重い）
+- `zundamon`: ずんだもん（ノーマル） - ID: 3（**推奨：軽量・高速**）
+- `no7-reading`: No.7（読み聞かせ） - ID: 31（非推奨：処理が非常に重い）
+- `aoyama-calm`: 青山龍星（しっとり） - ID: 84（非推奨：処理が重い）
 
-**注意**: デフォルトは `no7-reading` ですが、処理が重いため **zundamon の使用を推奨します**。
+**重要**: 現在の実装コードでは `no7-reading` がデフォルトに設定されていますが、処理が非常に重いため、**zundamon の使用を強く推奨します**。
+
+**実装コード変更の推奨**:
+`scripts/article_to_speech.js` の18行目を以下に変更することを推奨:
+```javascript
+// 現在（非推奨）
+const DEFAULT_SPEAKER = 'no7-reading';
+
+// 推奨
+const DEFAULT_SPEAKER = 'zundamon';
+```
 
 **前提条件**:
 - VOICEVOXアプリケーション起動中
@@ -654,11 +688,27 @@ Error: HTTP 500: {"detail":"Internal Server Error"}
 
 **対処法**:
 1. VOICEVOXアプリケーションを再起動
+
 2. APIサーバー確認:
    ```bash
+   # バージョン確認
    curl http://localhost:50021/version
+   # 期待される結果: {"version":"0.24.1"}
+   
+   # 話者リスト確認
+   curl http://localhost:50021/speakers
    ```
-3. ずんだもん以外のキャラクターは処理が重いため避ける
+
+3. VOICEVOXアプリケーション起動状態確認:
+   ```bash
+   # Windows（PowerShell/コマンドプロンプト）
+   tasklist | findstr VOICEVOX
+   
+   # Mac/Linux
+   ps aux | grep VOICEVOX
+   ```
+
+4. ずんだもん（zundamon）以外のキャラクターは処理が重いため避ける
 
 ---
 
@@ -669,14 +719,24 @@ Error: HTTP 500: {"detail":"Internal Server Error"}
 
 **対処法**:
 1. ブラウザの開発者ツール（F12）でコンソールエラー確認
+
 2. ファイルパス確認:
    ```bash
-   ls audio/記事名/
-   # article_ja-normal.mp3 または article_zundamon.wav が存在するか
+   # Windows（PowerShell）
+   ls audio\affinity-3-free-canva-ai-strategy-2025\
+   
+   # Windows（コマンドプロンプト）
+   dir audio\affinity-3-free-canva-ai-strategy-2025\
+   
+   # Mac/Linux
+   ls audio/affinity-3-free-canva-ai-strategy-2025/
+   
+   # 期待される結果: article_ja-normal.mp3 または article_zundamon.wav が存在する
    ```
+
 3. HTTPサーバー起動確認:
    ```bash
-   curl http://localhost:8081/audio/記事名/playlist.json
+   curl http://localhost:8081/audio/affinity-3-free-canva-ai-strategy-2025/playlist.json
    ```
 
 ---
@@ -695,7 +755,18 @@ Error: Cannot find module 'C:\...\venv_kokoro\Scripts\python.exe'
 
 **方法1: 仮想環境の存在確認**:
 ```bash
-ls venv_kokoro/Scripts/python.exe
+# Windows（PowerShell）
+Test-Path venv_kokoro\Scripts\python.exe
+# → True（存在する）または False（存在しない）
+
+# Windows（コマンドプロンプト）
+if exist venv_kokoro\Scripts\python.exe (echo 存在します) else (echo 存在しません)
+
+# Mac/Linux
+test -f venv_kokoro/bin/python && echo "存在します" || echo "存在しません"
+
+# 全OS対応（現在のPython実行ファイルのパスを表示）
+python -c "import sys; print(sys.executable)"
 ```
 
 **方法2: 仮想環境の再作成**:
@@ -839,13 +910,20 @@ venv_kokoro\Scripts\activate
 pip install gTTS
 
 # 3. 音声生成テスト（実際の記事を使用）
-node scripts/generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-normal
+cd scripts
+node generate_article_audio.js "..\articles\affinity-3-free-canva-ai-strategy-2025.md" ja-normal
 
-# 4. サーバー起動
+# 4. 生成確認
+ls ..\audio\affinity-3-free-canva-ai-strategy-2025\
+# → article_ja-normal.mp3 と playlist.json が存在することを確認
+
+# 5. サーバー起動（audio-readerディレクトリに戻る）
+cd ..
 node server.js
+# → Server running at http://localhost:8081/
 
-# 5. ブラウザでアクセス
-start http://localhost:8081/web/audio-player.html
+# 6. ブラウザでアクセス（新しいウィンドウで）
+start http://localhost:8081/
 ```
 
 ### B. 完全な環境構築コマンド（Mac/Linux）
@@ -861,13 +939,20 @@ source venv_kokoro/bin/activate
 pip install gTTS
 
 # 3. 音声生成テスト（実際の記事を使用）
-node scripts/generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-normal
+cd scripts
+node generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-normal
 
-# 4. サーバー起動
+# 4. 生成確認
+ls ../audio/affinity-3-free-canva-ai-strategy-2025/
+# → article_ja-normal.mp3 と playlist.json が存在することを確認
+
+# 5. サーバー起動（audio-readerディレクトリに戻る）
+cd ..
 node server.js
+# → Server running at http://localhost:8081/
 
-# 5. ブラウザでアクセス
-open http://localhost:8081/web/audio-player.html
+# 6. ブラウザでアクセス（新しいウィンドウで）
+open http://localhost:8081/
 ```
 
 ---
