@@ -13,6 +13,9 @@ function extractTextFromMarkdown(markdown) {
   // frontmatter除去
   let text = markdown.replace(/^---\n[\s\S]*?\n---\n/, '');
   
+  // 参照元セクションのみ除去（見出しとURLを削除、本文は残す）
+  text = text.replace(/^##\s*参照元\n[\s\S]*?(?=\n##\s)/m, '');
+  
   // 見出し記号除去
   text = text.replace(/^#{1,6}\s+/gm, '');
   
@@ -39,8 +42,8 @@ function extractTextFromMarkdown(markdown) {
   return text.trim();
 }
 
-// 長文を適切なチャンクに分割（VOICEVOXの制限対策）
-function splitIntoChunks(text, maxLength = 200) {
+// 長文をVOICEVOXのAPI制限に合わせて分割（1000文字程度）
+function splitIntoChunks(text, maxLength = 1000) {
   const sentences = text.split(/[。\n]/);
   const chunks = [];
   let currentChunk = '';
@@ -114,7 +117,7 @@ async function textToSpeech(text, speakerId) {
   return audioData;
 }
 
-// 複数の音声ファイルを結合（簡易実装：順次再生用に別ファイルとして保存）
+// 記事全体を音声化（チャンク分割は大きめに）
 async function createArticleAudio(articlePath, outputDir) {
   console.log(`記事読み込み: ${articlePath}`);
   
@@ -124,8 +127,8 @@ async function createArticleAudio(articlePath, outputDir) {
   
   console.log(`抽出したテキスト長: ${text.length}文字`);
   
-  // チャンクに分割
-  const chunks = splitIntoChunks(text, 200);
+  // VOICEVOX API制限対策で1000文字単位に分割
+  const chunks = splitIntoChunks(text, 1000);
   console.log(`${chunks.length}個のチャンクに分割`);
   
   // 各チャンクを音声化
