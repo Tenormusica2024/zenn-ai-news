@@ -46,12 +46,26 @@ node article_to_speech.js ../../articles/affinity-3-free-canva-ai-strategy-2025.
 
 ### ステップ2: Webプレイヤーで再生
 
+**🚨 重要: HTTPサーバー経由で起動する必要があります（CORS対策）**
+
 ```bash
-# audio-reader/web/audio-player.html をブラウザで開く
-start audio-reader/web/audio-player.html  # Windows
-# または
-open audio-reader/web/audio-player.html   # Mac/Linux
+# ローカルHTTPサーバーを起動
+cd audio-reader/web
+python -m http.server 8080
+
+# ブラウザで開く
+# http://localhost:8080/audio-player.html にアクセス
 ```
+
+**Windows簡易起動コマンド:**
+```bash
+cd audio-reader/web
+python -m http.server 8080 & start http://localhost:8080/audio-player.html
+```
+
+**⚠️ file:// プロトコルで直接開くとCORSエラーが発生します**
+- ❌ `start audio-player.html` - CORSエラー
+- ✅ `http://localhost:8080/audio-player.html` - 正常動作
 
 ## 🎨 プレイヤー機能
 
@@ -128,15 +142,25 @@ const chunks = splitIntoChunks(text, 200);  // 200文字で分割
   await new Promise(resolve => setTimeout(resolve, 200)); // 100→200ms
   ```
 
-### ブラウザで音声が再生できない
+### ブラウザで音声が再生できない / CORSエラー
+
+**原因:**
+- `file://` プロトコルで直接HTMLを開いている
+- ブラウザのCORSポリシーによりローカルファイル間のfetchがブロック
 
 **解決方法:**
-- ローカルサーバーを起動:
+- 必ずHTTPサーバー経由でアクセス:
   ```bash
   cd audio-reader/web
-  python -m http.server 8000
-  # http://localhost:8000/audio-player.html にアクセス
+  python -m http.server 8080
+  # http://localhost:8080/audio-player.html にアクセス
   ```
+
+**エラーメッセージ例:**
+```
+Access to fetch at 'file:///...' from origin 'null' has been blocked by CORS policy
+```
+→ HTTPサーバー起動で解決
 
 ## 📝 ライセンス
 
