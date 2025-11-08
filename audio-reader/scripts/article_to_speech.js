@@ -6,7 +6,7 @@ const path = require('path');
 const http = require('http');
 
 const VOICEVOX_API = 'http://localhost:50021';
-const SPEAKER_ID = 3; // ずんだもん（ノーマル）
+const SPEAKER_ID = 13; // 青山龍星（ノーマル）
 
 // マークダウンから本文を抽出（frontmatterと特殊記法を除去）
 function extractTextFromMarkdown(markdown) {
