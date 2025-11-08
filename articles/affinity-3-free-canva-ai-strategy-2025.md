@@ -3,7 +3,7 @@ title: "Affinityが完全無料化 - Canvaの「基本無料・AI有料」戦略
 emoji: "🎨"
 type: "tech"
 topics: ["Affinity", "デザインツール", "AI", "ビジネスモデル"]
-published: false
+published: true
 ---
 
 ## 参照元
