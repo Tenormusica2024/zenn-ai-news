@@ -49,23 +49,23 @@ node article_to_speech.js ../../articles/affinity-3-free-canva-ai-strategy-2025.
 **🚨 重要: HTTPサーバー経由で起動する必要があります（CORS対策）**
 
 ```bash
-# ローカルHTTPサーバーを起動
-cd audio-reader/web
+# ローカルHTTPサーバーを起動（audio-readerディレクトリから）
+cd audio-reader
 python -m http.server 8080
 
 # ブラウザで開く
-# http://localhost:8080/audio-player.html にアクセス
+# http://localhost:8080/web/audio-player.html にアクセス
 ```
 
 **Windows簡易起動コマンド:**
 ```bash
-cd audio-reader/web
-python -m http.server 8080 & start http://localhost:8080/audio-player.html
+cd audio-reader
+python -m http.server 8080 & start http://localhost:8080/web/audio-player.html
 ```
 
 **⚠️ file:// プロトコルで直接開くとCORSエラーが発生します**
 - ❌ `start audio-player.html` - CORSエラー
-- ✅ `http://localhost:8080/audio-player.html` - 正常動作
+- ✅ `http://localhost:8080/web/audio-player.html` - 正常動作
 
 ## 🎨 プレイヤー機能
 
@@ -151,9 +151,9 @@ const chunks = splitIntoChunks(text, 200);  // 200文字で分割
 **解決方法:**
 - 必ずHTTPサーバー経由でアクセス:
   ```bash
-  cd audio-reader/web
+  cd audio-reader
   python -m http.server 8080
-  # http://localhost:8080/audio-player.html にアクセス
+  # http://localhost:8080/web/audio-player.html にアクセス
   ```
 
 **エラーメッセージ例:**
