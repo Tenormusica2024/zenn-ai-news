@@ -111,19 +111,26 @@ function httpRequest(url, options = {}, binary = false) {
 async function textToSpeech(text, speakerId) {
   console.log(`テキスト変換中: ${text.substring(0, 50)}...`);
   
-  // 音声クエリ生成
-  const audioQueryUrl = `${VOICEVOX_API}/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`;
-  const audioQuery = await httpRequest(audioQueryUrl, { method: 'POST' });
-  
-  // 音声合成
-  const synthesisUrl = `${VOICEVOX_API}/synthesis?speaker=${speakerId}`;
-  const audioData = await httpRequest(synthesisUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: audioQuery
-  }, true);
-  
-  return audioData;
+  try {
+    // 音声クエリ生成
+    const audioQueryUrl = `${VOICEVOX_API}/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`;
+    const audioQuery = await httpRequest(audioQueryUrl, { method: 'POST' });
+    
+    // 音声合成
+    const synthesisUrl = `${VOICEVOX_API}/synthesis?speaker=${speakerId}`;
+    const audioData = await httpRequest(synthesisUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: audioQuery
+    }, true);
+    
+    return audioData;
+  } catch (error) {
+    console.error(`音声変換エラー: ${error.message}`);
+    console.error('VOICEVOX APIサーバーが起動しているか確認してください');
+    console.error(`確認コマンド: curl http://localhost:50021/version`);
+    throw error;
+  }
 }
 
 // WAVファイルを結合（シンプルな連結）
@@ -149,6 +156,18 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
   const speaker = AVAILABLE_SPEAKERS[speakerKey];
   console.log(`記事読み込み: ${articlePath}`);
   console.log(`話者: ${speaker.name} (ID: ${speaker.id})`);
+  
+  // VOICEVOXサーバー起動確認
+  try {
+    await httpRequest(`${VOICEVOX_API}/version`);
+  } catch (error) {
+    console.error('\n⚠️  VOICEVOXサーバーに接続できません');
+    console.error('以下を確認してください:');
+    console.error('1. VOICEVOXアプリケーションが起動しているか');
+    console.error('2. 設定 → エンジン → 「HTTPサーバーを起動する」がONか');
+    console.error('3. ポート番号が50021か\n');
+    throw new Error('VOICEVOX API server is not running');
+  }
   
   // マークダウンファイル読み込み
   const markdown = fs.readFileSync(articlePath, 'utf-8');

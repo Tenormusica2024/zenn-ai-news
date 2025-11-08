@@ -351,6 +351,11 @@ node article_to_speech.js ../articles/article.md zundamon
 - `no7-reading`: No.7（読み聞かせ） - ID: 31（非推奨：処理が非常に重い）
 - `aoyama-calm`: 青山龍星（しっとり） - ID: 84（非推奨：処理が重い）
 
+**注意**: speaker IDはVOICEVOXのバージョンにより異なる場合があります。正確なIDは以下のコマンドで確認できます:
+```bash
+curl http://localhost:50021/speakers
+```
+
 **前提条件**:
 - VOICEVOXアプリケーション起動中
 - APIサーバー: http://localhost:50021
@@ -687,7 +692,34 @@ python -c "import gtts; print(gtts.__version__)"
 
 ### Q2. VOICEVOX音声生成が失敗する
 
-**症状**:
+**症状1: APIサーバー接続エラー**
+```
+⚠️  VOICEVOXサーバーに接続できません
+以下を確認してください:
+1. VOICEVOXアプリケーションが起動しているか
+2. 設定 → エンジン → 「HTTPサーバーを起動する」がONか
+3. ポート番号が50021か
+```
+
+**対処法**:
+1. VOICEVOXアプリケーション起動確認:
+   ```bash
+   # Windows（PowerShell/コマンドプロンプト）
+   tasklist | findstr VOICEVOX
+   ```
+
+2. VOICEVOXの設定確認:
+   - メニューバー → 「設定」 → 「エンジン」タブ
+   - 「HTTPサーバーを起動する」にチェック
+   - ポート番号: 50021
+
+3. APIサーバー動作確認:
+   ```bash
+   curl http://localhost:50021/version
+   # 期待される結果: {"version":"0.24.1"}
+   ```
+
+**症状2: 音声生成中のエラー**
 ```
 Error: HTTP 500: {"detail":"Internal Server Error"}
 ```
@@ -695,26 +727,14 @@ Error: HTTP 500: {"detail":"Internal Server Error"}
 **対処法**:
 1. VOICEVOXアプリケーションを再起動
 
-2. APIサーバー確認:
+2. 話者リスト確認:
    ```bash
-   # バージョン確認
-   curl http://localhost:50021/version
-   # 期待される結果: {"version":"0.24.1"}
-   
-   # 話者リスト確認
    curl http://localhost:50021/speakers
    ```
 
-3. VOICEVOXアプリケーション起動状態確認:
-   ```bash
-   # Windows（PowerShell/コマンドプロンプト）
-   tasklist | findstr VOICEVOX
-   
-   # Mac/Linux
-   ps aux | grep VOICEVOX
-   ```
+3. ずんだもん（zundamon）以外のキャラクターは処理が重いため避ける
 
-4. ずんだもん（zundamon）以外のキャラクターは処理が重いため避ける
+4. テキストが長すぎる場合はチャンク分割サイズを小さくする（article_to_speech.js:160行目）
 
 ---
 
