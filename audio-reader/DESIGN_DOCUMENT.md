@@ -112,7 +112,7 @@ Zenn記事をMarkdown形式から音声ファイルに変換し、Webブラウ�
 
 | 技術 | バージョン | 用途 |
 |------|----------|------|
-| **Node.js** | v22.18.0 | 統合スクリプト・HTTPサーバー |
+| **Node.js** | v18以上（動作確認: v22.18.0） | 統合スクリプト・HTTPサーバー |
 | **Python** | 3.10+ | gTTS音声生成 |
 | **VOICEVOX** | 0.24.1 | 高品質音声生成（オプション） |
 
@@ -214,8 +214,12 @@ audio-reader/
 │   └── affinity-thumbnail.jpg     # サムネイル画像
 │
 ├── venv_kokoro/                    # Python仮想環境
-│   └── Scripts/
-│       └── python.exe
+│   ├── Lib/                        # Pythonライブラリ
+│   ├── Scripts/                    # 実行ファイル
+│   │   ├── python.exe
+│   │   ├── pip.exe
+│   │   └── activate.bat
+│   └── ...
 │
 ├── server.js                       # HTTPサーバー
 └── DESIGN_DOCUMENT.md              # 本ドキュメント
@@ -249,8 +253,11 @@ audio-reader/
 ```bash
 python gtts_article_to_speech.py <記事パス> [話者キー]
 
-# 例
-python gtts_article_to_speech.py ../articles/article.md ja-normal
+# 実際の記事ファイルを使用した例
+python gtts_article_to_speech.py ../articles/affinity-3-free-canva-ai-strategy-2025.md ja-normal
+
+# 一般的な例
+python gtts_article_to_speech.py ../articles/[記事名].md ja-normal
 ```
 
 **話者キー**:
@@ -290,14 +297,19 @@ python gtts_article_to_speech.py ../articles/article.md ja-normal
 ```bash
 node article_to_speech.js <記事パス> [話者キー]
 
-# 例
+# デフォルト（no7-reading）で生成
+node article_to_speech.js ../articles/article.md
+
+# 推奨: ずんだもんで生成（処理が軽い）
 node article_to_speech.js ../articles/article.md zundamon
 ```
 
 **話者キー**:
-- `zundamon`: ずんだもん（ノーマル） - ID: 3
-- `no7-reading`: No.7（読み聞かせ） - ID: 31（非推奨：重い）
+- `no7-reading`: No.7（読み聞かせ） - ID: 31（デフォルト、非推奨：処理重い）
+- `zundamon`: ずんだもん（ノーマル） - ID: 3（推奨：軽量）
 - `aoyama-calm`: 青山龍星（しっとり） - ID: 84（非推奨：重い）
+
+**注意**: デフォルトは `no7-reading` ですが、処理が重いため **zundamon の使用を推奨します**。
 
 **前提条件**:
 - VOICEVOXアプリケーション起動中
@@ -356,11 +368,14 @@ function runPythonScript(scriptName, articlePath, speakerKey) {
 ```bash
 cd scripts
 
-# gTTS（推奨：軽量・高速）
-node generate_article_audio.js "../articles/記事名.md" ja-normal
+# gTTS（推奨：軽量・高速） - 実際の例
+node generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-normal
 
-# VOICEVOX（高品質だが重い）
-node generate_article_audio.js "../articles/記事名.md" zundamon
+# VOICEVOX（高品質だが重い） - 実際の例
+node generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" zundamon
+
+# 一般的な例
+node generate_article_audio.js "../articles/[記事名].md" ja-normal
 ```
 
 ---
@@ -476,7 +491,7 @@ https://example.com
 | `speakerName` | string | 話者表示名 |
 | `chunks` | array | 音声ファイル名リスト（現在は常に1ファイル） |
 | `totalChunks` | number | チャンク数（現在は常に1） |
-| `engine` | string | 使用エンジン（gTTS, VOICEVOX） |
+| `engine` | string | 使用エンジン（gTTS, VOICEVOX）※VOICEVOXスクリプトでは未設定 |
 | `createdAt` | string | 生成日時（ISO 8601形式） |
 
 ---
@@ -576,12 +591,14 @@ voiceSelect.addEventListener('change', () => {
 #### エンドポイント
 
 ```
-GET /                           → web/audio-player.html
+GET /                           → web/audio-player.html（自動リダイレクト）
 GET /web/audio-player.html     → プレイヤーHTML
 GET /web/affinity-thumbnail.jpg → サムネイル画像
 GET /audio/[記事名]/[ファイル]   → 音声ファイル（MP3/WAV）
 GET /audio/[記事名]/playlist.json → メタデータ
 ```
+
+**注意**: ルート `/` へのアクセスは自動的に `/web/audio-player.html` にマッピングされます。
 
 #### MIMEタイプ
 
@@ -671,13 +688,30 @@ Error: HTTP 500: {"detail":"Internal Server Error"}
 Error: Cannot find module 'C:\...\venv_kokoro\Scripts\python.exe'
 ```
 
+**原因**:
+仮想環境が正しく作成されていない、または異なるディレクトリに存在する。
+
 **対処法**:
-`generate_article_audio.js` のPythonパス修正:
+
+**方法1: 仮想環境の存在確認**:
+```bash
+ls venv_kokoro/Scripts/python.exe
+```
+
+**方法2: 仮想環境の再作成**:
+```bash
+python -m venv venv_kokoro
+venv_kokoro\Scripts\activate
+pip install gTTS
+```
+
+**方法3: システムPythonを使用する場合**（非推奨）:
+`generate_article_audio.js` のLine 50を修正:
 ```javascript
-// 現在のパス
+// デフォルト（仮想環境使用）
 const pythonPath = path.join(__dirname, '..', 'venv_kokoro', 'Scripts', 'python.exe');
 
-// システムPythonを使う場合
+// システムPythonに変更（gTTSがシステムにインストールされている場合のみ）
 const pythonPath = 'python';  // または 'python3'
 ```
 
@@ -692,11 +726,24 @@ const pythonPath = 'python';  // または 'python3'
 
 **影響**: なし（音声ファイルは正常に生成される）
 
-**対処法**（オプション）:
+**対処法**:
+
+**方法1: PowerShellを使用（推奨）**:
+```powershell
+# PowerShellはデフォルトでUTF-8対応
+node generate_article_audio.js ...
+```
+
+**方法2: コードページ変更**:
 ```bash
-# PowerShellで実行
 chcp 65001  # UTF-8に変更
 node generate_article_audio.js ...
+```
+
+**方法3: スクリプト内でエンコーディング指定**:
+Pythonスクリプトの先頭に追加（既に `gtts_article_to_speech.py` には含まれている）:
+```python
+# -*- coding: utf-8 -*-
 ```
 
 ---
@@ -791,7 +838,7 @@ python -m venv venv_kokoro
 venv_kokoro\Scripts\activate
 pip install gTTS
 
-# 3. 音声生成テスト
+# 3. 音声生成テスト（実際の記事を使用）
 node scripts/generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-normal
 
 # 4. サーバー起動
@@ -813,7 +860,7 @@ python3 -m venv venv_kokoro
 source venv_kokoro/bin/activate
 pip install gTTS
 
-# 3. 音声生成テスト
+# 3. 音声生成テスト（実際の記事を使用）
 node scripts/generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-normal
 
 # 4. サーバー起動
