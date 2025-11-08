@@ -117,7 +117,25 @@ async function textToSpeech(text, speakerId) {
   return audioData;
 }
 
-// 記事全体を音声化（チャンク分割は大きめに）
+// WAVファイルを結合（シンプルな連結）
+function concatenateWavBuffers(buffers) {
+  // 最初のWAVヘッダーを取得
+  const firstHeader = buffers[0].slice(0, 44);
+  
+  // 全データ部分を結合
+  const dataChunks = buffers.map(buf => buf.slice(44));
+  const totalDataSize = dataChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  
+  // 新しいWAVヘッダーを作成（データサイズを更新）
+  const header = Buffer.from(firstHeader);
+  header.writeUInt32LE(totalDataSize + 36, 4); // ChunkSize
+  header.writeUInt32LE(totalDataSize, 40);     // Subchunk2Size
+  
+  // ヘッダー + 全データを結合
+  return Buffer.concat([header, ...dataChunks]);
+}
+
+// 記事全体を1つの音声ファイルとして生成
 async function createArticleAudio(articlePath, outputDir) {
   console.log(`記事読み込み: ${articlePath}`);
   
@@ -129,31 +147,36 @@ async function createArticleAudio(articlePath, outputDir) {
   
   // VOICEVOX API制限対策で1000文字単位に分割
   const chunks = splitIntoChunks(text, 1000);
-  console.log(`${chunks.length}個のチャンクに分割`);
+  console.log(`${chunks.length}個のチャンクに分割して生成（最終的に1ファイルに結合）`);
   
-  // 各チャンクを音声化
-  const audioFiles = [];
+  // 各チャンクを音声化してバッファに保存
+  const audioBuffers = [];
   for (let i = 0; i < chunks.length; i++) {
     console.log(`[${i + 1}/${chunks.length}] 音声生成中...`);
     const audioData = await textToSpeech(chunks[i], SPEAKER_ID);
-    
-    const filename = `chunk_${String(i).padStart(3, '0')}.wav`;
-    const filepath = path.join(outputDir, filename);
-    fs.writeFileSync(filepath, audioData);
-    audioFiles.push(filename);
+    audioBuffers.push(audioData);
     
     // API負荷軽減のため少し待機
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   
-  console.log(`\n✅ 音声ファイル生成完了: ${audioFiles.length}個`);
+  // 全チャンクを1つのWAVファイルに結合
+  console.log(`\n音声ファイルを結合中...`);
+  const combinedAudio = concatenateWavBuffers(audioBuffers);
+  
+  // 1つのファイルとして保存
+  const filename = 'article.wav';
+  const filepath = path.join(outputDir, filename);
+  fs.writeFileSync(filepath, combinedAudio);
+  
+  console.log(`\n✅ 音声ファイル生成完了: ${filename}`);
   console.log(`出力先: ${outputDir}`);
   
   // プレイリスト情報を保存
   const playlist = {
     article: path.basename(articlePath),
-    chunks: audioFiles,
-    totalChunks: audioFiles.length,
+    chunks: [filename],
+    totalChunks: 1,
     createdAt: new Date().toISOString()
   };
   
@@ -162,7 +185,7 @@ async function createArticleAudio(articlePath, outputDir) {
     JSON.stringify(playlist, null, 2)
   );
   
-  return audioFiles;
+  return [filename];
 }
 
 // メイン処理
