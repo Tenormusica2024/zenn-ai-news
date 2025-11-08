@@ -75,35 +75,58 @@ function splitIntoChunks(text, maxLength = 1000) {
   return chunks;
 }
 
-// HTTP リクエストヘルパー
-function httpRequest(url, options = {}, binary = false) {
-  return new Promise((resolve, reject) => {
-    const req = http.request(url, {
-      method: options.method || 'GET',
-      headers: options.headers || {}
-    }, (res) => {
-      const chunks = [];
-      res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => {
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString()}`));
-          return;
-        }
-        if (binary) {
-          resolve(Buffer.concat(chunks));
-        } else {
-          resolve(Buffer.concat(chunks).toString());
-        }
-      });
-    });
+// HTTP リクエストヘルパー（タイムアウト・リトライ対応）
+function httpRequest(url, options = {}, binary = false, timeout = 30000, retries = 3) {
+  return new Promise(async (resolve, reject) => {
+    let lastError = null;
     
-    req.on('error', reject);
-    
-    if (options.body) {
-      req.write(options.body);
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const result = await new Promise((resolveInner, rejectInner) => {
+          const req = http.request(url, {
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            timeout: timeout
+          }, (res) => {
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => {
+              if (res.statusCode !== 200) {
+                rejectInner(new Error(`HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString()}`));
+                return;
+              }
+              if (binary) {
+                resolveInner(Buffer.concat(chunks));
+              } else {
+                resolveInner(Buffer.concat(chunks).toString());
+              }
+            });
+          });
+          
+          req.on('error', rejectInner);
+          req.on('timeout', () => {
+            req.destroy();
+            rejectInner(new Error(`Request timeout after ${timeout}ms`));
+          });
+          
+          if (options.body) {
+            req.write(options.body);
+          }
+          
+          req.end();
+        });
+        
+        return resolve(result);
+      } catch (error) {
+        lastError = error;
+        if (attempt < retries) {
+          console.log(`リトライ ${attempt}/${retries}: ${error.message}`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
     }
     
-    req.end();
+    reject(new Error(`Failed after ${retries} attempts: ${lastError.message}`));
   });
 }
 
@@ -179,20 +202,54 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
   const chunks = splitIntoChunks(text, 1000);
   console.log(`${chunks.length}個のチャンクに分割して生成（最終的に1ファイルに結合）`);
   
-  // 各チャンクを音声化してバッファに保存
+  // 各チャンクを音声化してバッファに保存（エラー時は部分保存）
   const audioBuffers = [];
+  let failedChunks = [];
+  
   for (let i = 0; i < chunks.length; i++) {
     console.log(`[${i + 1}/${chunks.length}] 音声生成中...`);
-    const audioData = await textToSpeech(chunks[i], speaker.id);
-    audioBuffers.push(audioData);
-    
-    // API負荷軽減のため少し待機
-    await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      const audioData = await textToSpeech(chunks[i], speaker.id);
+      audioBuffers.push(audioData);
+      
+      // API負荷軽減のため少し待機
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.error(`⚠️  チャンク ${i + 1} の音声生成失敗: ${error.message}`);
+      failedChunks.push(i + 1);
+      
+      // 3個以上連続で失敗した場合は中断
+      if (failedChunks.length >= 3 && failedChunks.slice(-3).every((v, idx) => v === i + 1 - 2 + idx)) {
+        console.error('\n3個以上のチャンクが連続で失敗しました。処理を中断します。');
+        if (audioBuffers.length > 0) {
+          console.log(`\n部分的に生成された音声（${audioBuffers.length}チャンク）を保存します...`);
+          break;
+        } else {
+          throw new Error('音声生成に失敗しました');
+        }
+      }
+    }
+  }
+  
+  if (audioBuffers.length === 0) {
+    throw new Error('音声データが1つも生成されませんでした');
+  }
+  
+  if (failedChunks.length > 0) {
+    console.log(`\n⚠️  失敗したチャンク: ${failedChunks.join(', ')}`);
+    console.log(`成功したチャンク: ${audioBuffers.length}/${chunks.length}`);
   }
   
   // 全チャンクを1つのWAVファイルに結合
   console.log(`\n音声ファイルを結合中...`);
-  const combinedAudio = concatenateWavBuffers(audioBuffers);
+  let combinedAudio;
+  try {
+    combinedAudio = concatenateWavBuffers(audioBuffers);
+    console.log(`結合後のファイルサイズ: ${(combinedAudio.length / 1024 / 1024).toFixed(2)} MB`);
+  } catch (error) {
+    console.error(`WAVファイル結合エラー: ${error.message}`);
+    throw new Error(`音声ファイルの結合に失敗しました: ${error.message}`);
+  }
   
   // 1つのファイルとして保存（話者名を含む）
   const filename = `article_${speakerKey}.wav`;
