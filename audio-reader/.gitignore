@@ -1,0 +1,14 @@
+# 音声ファイル（サイズが大きいためGit管理外）
+audio/**/*.wav
+
+# ただしplaylist.jsonは管理対象
+!audio/**/playlist.json
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# OS
+.DS_Store
+Thumbs.db
