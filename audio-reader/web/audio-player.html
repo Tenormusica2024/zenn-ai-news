@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenn記事音声朗読プレイヤー</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    
+    .article-title {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 30px;
+      font-weight: normal;
+    }
+    
+    .player {
+      background: #f8f9fa;
+      border-radius: 15px;
+      padding: 30px;
+      margin-bottom: 20px;
+    }
+    
+    .progress-container {
+      background: #e0e0e0;
+      height: 8px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      cursor: pointer;
+      position: relative;
+    }
+    
+    .progress-bar {
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      height: 100%;
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.1s;
+    }
+    
+    .time-display {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 25px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: 600;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .chunk-info {
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 15px;
+    }
+    
+    .chunk-list {
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+    }
+    
+    .chunk-item {
+      padding: 8px 12px;
+      margin-bottom: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 14px;
+    }
+    
+    .chunk-item:hover {
+      background: #f0f0f0;
+    }
+    
+    .chunk-item.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-weight: 600;
+    }
+    
+    .loading {
+      text-align: center;
+      color: #666;
+      padding: 20px;
+    }
+    
+    .speed-control {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    .speed-control label {
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .speed-control select {
+      padding: 5px 10px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎙️ Zenn記事音声朗読</h1>
+    <p class="article-title" id="articleTitle">読み込み中...</p>
+    
+    <div class="player">
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      
+      <div class="time-display">
+        <span id="currentTime">0:00</span>
+        <span id="totalTime">0:00</span>
+      </div>
+      
+      <div class="chunk-info" id="chunkInfo">チャンク 0 / 0</div>
+      
+      <div class="controls">
+        <button id="prevBtn" disabled>⏮️ 前へ</button>
+        <button id="playBtn">▶️ 再生</button>
+        <button id="nextBtn" disabled>次へ ⏭️</button>
+      </div>
+      
+      <div class="speed-control">
+        <label for="speedSelect">再生速度:</label>
+        <select id="speedSelect">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1.0x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2.0x</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="chunk-list" id="chunkList">
+      <div class="loading">プレイリスト読み込み中...</div>
+    </div>
+  </div>
+  
+  <audio id="audio" preload="auto"></audio>
+  
+  <script>
+    const audio = document.getElementById('audio');
+    const playBtn = document.getElementById('playBtn');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const progressBar = document.getElementById('progressBar');
+    const progressContainer = document.getElementById('progressContainer');
+    const currentTimeDisplay = document.getElementById('currentTime');
+    const totalTimeDisplay = document.getElementById('totalTime');
+    const chunkInfo = document.getElementById('chunkInfo');
+    const chunkList = document.getElementById('chunkList');
+    const articleTitle = document.getElementById('articleTitle');
+    const speedSelect = document.getElementById('speedSelect');
+    
+    let playlist = null;
+    let currentChunkIndex = 0;
+    const audioBasePath = '../audio/affinity-3-free-canva-ai-strategy-2025/';
+    
+    // プレイリスト読み込み
+    async function loadPlaylist() {
+      try {
+        const response = await fetch(audioBasePath + 'playlist.json');
+        playlist = await response.json();
+        
+        articleTitle.textContent = playlist.article.replace('.md', '').replace(/-/g, ' ');
+        updateChunkInfo();
+        renderChunkList();
+        loadChunk(0);
+      } catch (error) {
+        chunkList.innerHTML = '<div class="loading">エラー: プレイリストを読み込めませんでした</div>';
+        console.error('Playlist load error:', error);
+      }
+    }
+    
+    // チャンク情報更新
+    function updateChunkInfo() {
+      chunkInfo.textContent = `チャンク ${currentChunkIndex + 1} / ${playlist.totalChunks}`;
+    }
+    
+    // チャンクリスト表示
+    function renderChunkList() {
+      chunkList.innerHTML = playlist.chunks.map((chunk, index) => {
+        return `<div class="chunk-item ${index === currentChunkIndex ? 'active' : ''}" 
+                     data-index="${index}">
+                  ${index + 1}. ${chunk}
+                </div>`;
+      }).join('');
+      
+      // クリックイベント
+      document.querySelectorAll('.chunk-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const index = parseInt(item.dataset.index);
+          loadChunk(index);
+          audio.play();
+        });
+      });
+    }
+    
+    // チャンク読み込み
+    function loadChunk(index) {
+      if (index < 0 || index >= playlist.totalChunks) return;
+      
+      currentChunkIndex = index;
+      audio.src = audioBasePath + playlist.chunks[index];
+      updateChunkInfo();
+      updateButtons();
+      renderChunkList();
+    }
+    
+    // ボタン状態更新
+    function updateButtons() {
+      prevBtn.disabled = currentChunkIndex === 0;
+      nextBtn.disabled = currentChunkIndex === playlist.totalChunks - 1;
+    }
+    
+    // 時間フォーマット
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // 再生/一時停止
+    playBtn.addEventListener('click', () => {
+      if (audio.paused) {
+        audio.play();
+      } else {
+        audio.pause();
+      }
+    });
+    
+    // 前へ
+    prevBtn.addEventListener('click', () => {
+      if (currentChunkIndex > 0) {
+        loadChunk(currentChunkIndex - 1);
+        audio.play();
+      }
+    });
+    
+    // 次へ
+    nextBtn.addEventListener('click', () => {
+      if (currentChunkIndex < playlist.totalChunks - 1) {
+        loadChunk(currentChunkIndex + 1);
+        audio.play();
+      }
+    });
+    
+    // 再生状態更新
+    audio.addEventListener('play', () => {
+      playBtn.textContent = '⏸️ 一時停止';
+    });
+    
+    audio.addEventListener('pause', () => {
+      playBtn.textContent = '▶️ 再生';
+    });
+    
+    // 進捗更新
+    audio.addEventListener('timeupdate', () => {
+      const progress = (audio.currentTime / audio.duration) * 100;
+      progressBar.style.width = `${progress}%`;
+      currentTimeDisplay.textContent = formatTime(audio.currentTime);
+    });
+    
+    // 総時間表示
+    audio.addEventListener('loadedmetadata', () => {
+      totalTimeDisplay.textContent = formatTime(audio.duration);
+    });
+    
+    // チャンク終了時に次へ自動移行
+    audio.addEventListener('ended', () => {
+      if (currentChunkIndex < playlist.totalChunks - 1) {
+        loadChunk(currentChunkIndex + 1);
+        audio.play();
+      }
+    });
+    
+    // プログレスバークリックでシーク
+    progressContainer.addEventListener('click', (e) => {
+      const rect = progressContainer.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const percentage = clickX / rect.width;
+      audio.currentTime = audio.duration * percentage;
+    });
+    
+    // 再生速度変更
+    speedSelect.addEventListener('change', () => {
+      audio.playbackRate = parseFloat(speedSelect.value);
+    });
+    
+    // 初期化
+    loadPlaylist();
+  </script>
+</body>
+</html>
