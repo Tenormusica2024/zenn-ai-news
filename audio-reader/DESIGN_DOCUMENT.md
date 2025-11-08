@@ -136,11 +136,26 @@ requests==2.32.5      # HTTP依存関係
 
 ## 環境構築手順
 
-### 前提条件
+### 前提条件確認
 
-- Node.js v18以上
-- Python 3.10以上
-- インターネット接続（gTTS使用時）
+以下のコマンドを実行して、必要なバージョンがインストールされているか確認してください。
+
+```bash
+# Node.jsバージョン確認
+node --version
+# v18.0.0以上が必要（確認済み動作バージョン: v22.18.0）
+
+# Pythonバージョン確認
+python --version
+# Python 3.10.0以上が必要
+
+# インターネット接続確認（gTTS使用時に必要）
+ping google.com -n 1
+```
+
+**バージョンが古い場合**:
+- Node.js: https://nodejs.org/ からLTS版をダウンロード
+- Python: https://www.python.org/downloads/ から3.10以上をダウンロード
 
 ### 1. プロジェクトクローン
 
@@ -179,14 +194,17 @@ pip install gTTS
 
 # 3. VOICEVOXアプリケーションを起動
 # - Windowsの場合: スタートメニュー → VOICEVOX
-# - Macの場合: アプリケーションフォルダ → VOICEVOX
 
-# 4. APIサーバー起動確認
+# 4. APIサーバーの起動確認（重要）
+# VOICEVOXのメニューバー → 「設定」 → 「エンジン」タブ
+# 「HTTPサーバーを起動する」にチェックが入っていることを確認
+# ポート番号が50021であることを確認
+
+# 5. APIサーバー動作確認
 curl http://localhost:50021/version
 # 成功例: {"version":"0.24.1"}
 # 失敗例: curl: (7) Failed to connect to localhost port 50021
-
-# 注意: VOICEVOXアプリケーションを起動すると、自動的にAPIサーバーが http://localhost:50021 で起動します
+#   → VOICEVOXの設定で「HTTPサーバーを起動する」を有効化してください
 ```
 
 ### 4. Node.js依存関係（不要）
@@ -321,29 +339,17 @@ python gtts_article_to_speech.py ../articles/[記事名].md ja-normal
 ```bash
 node article_to_speech.js <記事パス> [話者キー]
 
-# デフォルト（no7-reading）で生成
+# デフォルト（zundamon）で生成
 node article_to_speech.js ../articles/article.md
 
-# 推奨: ずんだもんで生成（処理が軽い）
+# 明示的にzundamonを指定（推奨）
 node article_to_speech.js ../articles/article.md zundamon
 ```
 
 **話者キー**:
-- `zundamon`: ずんだもん（ノーマル） - ID: 3（**推奨：軽量・高速**）
+- `zundamon`: ずんだもん（ノーマル） - ID: 3（**デフォルト、推奨：軽量・高速**）
 - `no7-reading`: No.7（読み聞かせ） - ID: 31（非推奨：処理が非常に重い）
 - `aoyama-calm`: 青山龍星（しっとり） - ID: 84（非推奨：処理が重い）
-
-**重要**: 現在の実装コードでは `no7-reading` がデフォルトに設定されていますが、処理が非常に重いため、**zundamon の使用を強く推奨します**。
-
-**実装コード変更の推奨**:
-`scripts/article_to_speech.js` の18行目を以下に変更することを推奨:
-```javascript
-// 現在（非推奨）
-const DEFAULT_SPEAKER = 'no7-reading';
-
-// 推奨
-const DEFAULT_SPEAKER = 'zundamon';
-```
 
 **前提条件**:
 - VOICEVOXアプリケーション起動中
@@ -525,7 +531,7 @@ https://example.com
 | `speakerName` | string | 話者表示名 |
 | `chunks` | array | 音声ファイル名リスト（現在は常に1ファイル） |
 | `totalChunks` | number | チャンク数（現在は常に1） |
-| `engine` | string | 使用エンジン（gTTS, VOICEVOX）※VOICEVOXスクリプトでは未設定 |
+| `engine` | string | 使用エンジン（gTTS, VOICEVOX） |
 | `createdAt` | string | 生成日時（ISO 8601形式） |
 
 ---
@@ -909,21 +915,32 @@ python -m venv venv_kokoro
 venv_kokoro\Scripts\activate
 pip install gTTS
 
-# 3. 音声生成テスト（実際の記事を使用）
-cd scripts
-node generate_article_audio.js "..\articles\affinity-3-free-canva-ai-strategy-2025.md" ja-normal
+# 3. サンプル記事作成（初回テスト用）
+mkdir ..\articles 2>nul
+echo ---> ..\articles\test-article.md
+echo title: テスト記事>> ..\articles\test-article.md
+echo --->> ..\articles\test-article.md
+echo.>> ..\articles\test-article.md
+echo # はじめに>> ..\articles\test-article.md
+echo これはテスト用の記事です。>> ..\articles\test-article.md
 
-# 4. 生成確認
-ls ..\audio\affinity-3-free-canva-ai-strategy-2025\
+# 4. 音声生成テスト
+cd scripts
+node generate_article_audio.js "..\articles\test-article.md" ja-normal
+
+# 5. 生成確認
+dir ..\audio\test-article\
 # → article_ja-normal.mp3 と playlist.json が存在することを確認
 
-# 5. サーバー起動（audio-readerディレクトリに戻る）
+# 6. サーバー起動（audio-readerディレクトリに戻る）
 cd ..
 node server.js
 # → Server running at http://localhost:8081/
 
-# 6. ブラウザでアクセス（新しいウィンドウで）
+# 7. ブラウザでアクセス（新しいウィンドウで）
 start http://localhost:8081/
+
+# 注意: 実際の記事でテストする場合は、articles/フォルダに記事を配置してから実行してください
 ```
 
 ### B. 完全な環境構築コマンド（Mac/Linux）

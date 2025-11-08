@@ -15,7 +15,7 @@ const AVAILABLE_SPEAKERS = {
 };
 
 // デフォルトの話者（コマンドライン引数で変更可能）
-const DEFAULT_SPEAKER = 'no7-reading';
+const DEFAULT_SPEAKER = 'zundamon';
 
 // マークダウンから本文を抽出（frontmatterと特殊記法を除去）
 function extractTextFromMarkdown(markdown) {
@@ -190,6 +190,7 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
     speakerName: speaker.name,
     chunks: [filename],
     totalChunks: 1,
+    engine: "VOICEVOX",
     createdAt: new Date().toISOString()
   };
   
