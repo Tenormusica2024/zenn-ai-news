@@ -23,6 +23,35 @@ AVAILABLE_VOICES = {
 
 DEFAULT_VOICE = 'ja-normal'
 
+def validate_article_content(markdown, article_path):
+    """記事ファイルの内容を検証（破損検出）"""
+    
+    # 最小文字数チェック
+    if len(markdown) < 500:
+        raise ValueError(
+            f"[エラー] 記事ファイルが短すぎます（{len(markdown)}文字）\n"
+            f"正常な記事は通常500文字以上あります。\n"
+            f"ファイル: {article_path}"
+        )
+    
+    # 404エラーテキストチェック
+    if markdown.strip() == "404: Not Found":
+        raise ValueError(
+            f"[エラー] 記事ファイルが404エラーテキストのみです\n"
+            f"正しい記事内容を確認してください。\n"
+            f"ファイル: {article_path}"
+        )
+    
+    # frontmatterの存在確認
+    if not markdown.startswith("---"):
+        raise ValueError(
+            f"[エラー] 記事ファイルがfrontmatterで始まっていません\n"
+            f"Zenn記事は '---' で始まる必要があります。\n"
+            f"ファイル: {article_path}"
+        )
+    
+    print(f"[OK] 記事ファイル検証: 正常")
+
 def extract_text_from_markdown(markdown):
     """マークダウンから本文を抽出"""
     # frontmatter除去
@@ -72,8 +101,16 @@ def generate_audio(article_path, output_dir, voice_key=DEFAULT_VOICE):
     with open(article_path, 'r', encoding='utf-8') as f:
         markdown = f.read()
     
+    # 記事内容の検証（破損検出）
+    validate_article_content(markdown, article_path)
+    
     text = extract_text_from_markdown(markdown)
     print(f"抽出したテキスト長: {len(text)}文字")
+    
+    # 抽出テキストの長さ警告
+    if len(text) < 1000:
+        print(f"[警告] 抽出テキストが短すぎます（{len(text)}文字）")
+        print(f"正常な記事からは通常1000文字以上のテキストが抽出されます")
     
     # 出力ディレクトリ作成
     output_path = Path(output_dir)
