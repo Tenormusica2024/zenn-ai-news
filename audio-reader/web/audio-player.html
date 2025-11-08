@@ -195,8 +195,8 @@
       margin-bottom: 15px;
     }
     
-    .chunk-list {
-      max-height: 200px;
+    .article-list {
+      max-height: 400px;
       overflow-y: auto;
       background: linear-gradient(135deg, 
         rgba(20, 20, 20, 0.6) 0%, 
@@ -206,28 +206,39 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
-    .chunk-item {
-      padding: 8px 12px;
-      margin-bottom: 5px;
-      border-radius: 5px;
+    .article-item {
+      padding: 12px 15px;
+      margin-bottom: 10px;
+      border-radius: 8px;
       cursor: pointer;
       transition: all 0.3s ease;
-      font-size: 14px;
-      color: #aaa;
+      font-size: 15px;
+      color: #ccc;
       border: 1px solid transparent;
+      background: rgba(30, 30, 30, 0.5);
     }
     
-    .chunk-item:hover {
-      background: rgba(255, 255, 255, 0.05);
+    .article-item:hover {
+      background: rgba(255, 255, 255, 0.08);
       color: #ffffff;
-      border-color: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateX(5px);
     }
     
-    .chunk-item.active {
+    .article-item.active {
       background: linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(138, 43, 226, 0.3));
       color: #ffffff;
       font-weight: 600;
       border-color: rgba(74, 158, 255, 0.5);
+      box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+    }
+    
+    .article-list-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #999;
+      margin-bottom: 15px;
+      text-align: center;
     }
     
     .loading {
@@ -366,8 +377,9 @@
       </div>
     </div>
     
-    <div class="chunk-list" id="chunkList">
-      <div class="loading">プレイリスト読み込み中...</div>
+    <div class="article-list" id="articleList">
+      <div class="article-list-title">📚 記事一覧</div>
+      <div class="loading">読み込み中...</div>
     </div>
   </div>
   
@@ -383,74 +395,94 @@
     const currentTimeDisplay = document.getElementById('currentTime');
     const totalTimeDisplay = document.getElementById('totalTime');
     const chunkInfo = document.getElementById('chunkInfo');
-    const chunkList = document.getElementById('chunkList');
+    const articleList = document.getElementById('articleList');
     const articleTitle = document.getElementById('articleTitle');
     const speedSelect = document.getElementById('speedSelect');
     const voiceSelect = document.getElementById('voiceSelect');
     
-    let playlist = null;
-    let currentChunkIndex = 0;
+    let articles = [];
+    let currentArticleIndex = 0;
     let currentVoice = 'ja-normal';
-    const audioBasePath = '../audio/affinity-3-free-canva-ai-strategy-2025/';
     
-    // プレイリスト読み込み
-    async function loadPlaylist() {
+    // 利用可能な記事リスト
+    const availableArticles = [
+      {
+        slug: 'affinity-3-free-canva-ai-strategy-2025',
+        title: 'Affinity無料化でCanvaのAI戦略が明らかに',
+        thumbnail: '/web/affinity-thumbnail.jpg'
+      },
+      {
+        slug: 'ai-agents-70-percent-failure-reality-2025',
+        title: 'AIエージェントの70%が失敗する現実',
+        thumbnail: '/web/affinity-thumbnail.jpg'
+      }
+    ];
+    
+    // 記事一覧読み込み
+    async function loadArticles() {
       try {
-        const response = await fetch(audioBasePath + 'playlist.json');
-        playlist = await response.json();
-        
-        articleTitle.textContent = playlist.article.replace('.md', '').replace(/-/g, ' ');
-        updateChunkInfo();
-        renderChunkList();
-        loadChunk(0);
+        articles = availableArticles;
+        renderArticleList();
+        loadArticle(0);
       } catch (error) {
-        chunkList.innerHTML = '<div class="loading">エラー: プレイリストを読み込めませんでした</div>';
-        console.error('Playlist load error:', error);
+        articleList.innerHTML = '<div class="loading">エラー: 記事を読み込めませんでした</div>';
+        console.error('Articles load error:', error);
       }
     }
     
-    // チャンク情報更新
-    function updateChunkInfo() {
-      chunkInfo.textContent = `チャンク ${currentChunkIndex + 1} / ${playlist.totalChunks}`;
+    // 記事情報更新
+    function updateArticleInfo() {
+      chunkInfo.textContent = `記事 ${currentArticleIndex + 1} / ${articles.length}`;
     }
     
-    // チャンクリスト表示
-    function renderChunkList() {
-      chunkList.innerHTML = playlist.chunks.map((chunk, index) => {
-        return `<div class="chunk-item ${index === currentChunkIndex ? 'active' : ''}" 
-                     data-index="${index}">
-                  ${index + 1}. ${chunk}
-                </div>`;
-      }).join('');
+    // 記事リスト表示
+    function renderArticleList() {
+      const listHTML = '<div class="article-list-title">📚 記事一覧</div>' +
+        articles.map((article, index) => {
+          return `<div class="article-item ${index === currentArticleIndex ? 'active' : ''}" 
+                       data-index="${index}">
+                    ${article.title}
+                  </div>`;
+        }).join('');
+      
+      articleList.innerHTML = listHTML;
       
       // クリックイベント
-      document.querySelectorAll('.chunk-item').forEach(item => {
+      document.querySelectorAll('.article-item').forEach(item => {
         item.addEventListener('click', () => {
           const index = parseInt(item.dataset.index);
-          loadChunk(index);
+          loadArticle(index);
           audio.play();
         });
       });
     }
     
-    // チャンク読み込み
-    function loadChunk(index) {
-      if (index < 0 || index >= playlist.totalChunks) return;
+    // 記事読み込み
+    function loadArticle(index) {
+      if (index < 0 || index >= articles.length) return;
       
-      currentChunkIndex = index;
+      currentArticleIndex = index;
+      const article = articles[index];
+      const audioBasePath = `../audio/${article.slug}/`;
+      
+      // タイトルとサムネイル更新
+      articleTitle.textContent = article.title;
+      document.querySelector('.thumbnail').src = article.thumbnail;
+      
       // gTTSはMP3、VOICEVOXはWAV
       const extension = currentVoice === 'ja-normal' ? 'mp3' : 'wav';
       const filename = `article_${currentVoice}.${extension}`;
       audio.src = audioBasePath + filename;
-      updateChunkInfo();
+      
+      updateArticleInfo();
       updateButtons();
-      renderChunkList();
+      renderArticleList();
     }
     
     // ボタン状態更新
     function updateButtons() {
-      prevBtn.disabled = currentChunkIndex === 0;
-      nextBtn.disabled = currentChunkIndex === playlist.totalChunks - 1;
+      prevBtn.disabled = currentArticleIndex === 0;
+      nextBtn.disabled = currentArticleIndex === articles.length - 1;
     }
     
     // 時間フォーマット
@@ -471,16 +503,16 @@
     
     // 前へ
     prevBtn.addEventListener('click', () => {
-      if (currentChunkIndex > 0) {
-        loadChunk(currentChunkIndex - 1);
+      if (currentArticleIndex > 0) {
+        loadArticle(currentArticleIndex - 1);
         audio.play();
       }
     });
     
     // 次へ
     nextBtn.addEventListener('click', () => {
-      if (currentChunkIndex < playlist.totalChunks - 1) {
-        loadChunk(currentChunkIndex + 1);
+      if (currentArticleIndex < articles.length - 1) {
+        loadArticle(currentArticleIndex + 1);
         audio.play();
       }
     });
@@ -506,10 +538,10 @@
       totalTimeDisplay.textContent = formatTime(audio.duration);
     });
     
-    // チャンク終了時に次へ自動移行
+    // 記事終了時に次へ自動移行
     audio.addEventListener('ended', () => {
-      if (currentChunkIndex < playlist.totalChunks - 1) {
-        loadChunk(currentChunkIndex + 1);
+      if (currentArticleIndex < articles.length - 1) {
+        loadArticle(currentArticleIndex + 1);
         audio.play();
       }
     });
@@ -533,7 +565,7 @@
       const wasPlaying = !audio.paused;
       const currentTime = audio.currentTime;
       
-      loadChunk(currentChunkIndex);
+      loadArticle(currentArticleIndex);
       
       audio.addEventListener('loadedmetadata', () => {
         audio.currentTime = currentTime;
@@ -544,7 +576,7 @@
     });
     
     // 初期化
-    loadPlaylist();
+    loadArticles();
   </script>
 </body>
 </html>
