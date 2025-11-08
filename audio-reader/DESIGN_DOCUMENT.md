@@ -1025,6 +1025,354 @@ open http://localhost:8081/
 |------|----------|------|
 | 2025-11-08 | v1.0.0 | 初版作成（gTTS導入完了） |
 | 2025-11-08 | v1.1.0 | 本質的エラーハンドリング実装（タイムアウト・リトライ・部分的成功処理追加） |
+| 2025-11-08 | v1.1.1 | 記事ファイル404エラー修正対応（詳細は下記「エラー対応ログ」参照） |
+
+---
+
+## エラー対応ログ
+
+### 2025-11-08: 記事音声「404notfound」問題の解決
+
+#### 問題の概要
+
+**症状:**
+- 2つ目の記事「AIエージェントの70%が失敗する現実」の音声再生時に「404notfound」とだけ読み上げられる
+- HTTPステータスコードは200 OKで正常応答
+- 音声ファイルは正常に存在・配信されている
+
+#### 原因の特定
+
+**誤診1（当初の仮説 - 誤り）:**
+音声ファイルのパス問題だと推測し、`audio-player.html`のLine 466を修正:
+```javascript
+// 修正前
+const audioBasePath = `../audio/${article.slug}/`;
+// 修正後
+const audioBasePath = `/audio/${article.slug}/`;  // 相対パス→絶対パス
+```
+
+**実際の原因（真因）:**
+記事のMarkdownファイル自体が「404: Not Found」というテキストのみで構成されていた:
+```bash
+$ cat articles/ai-agents-70-percent-failure-reality-2025.md
+404: Not Found
+```
+
+gTTSスクリプトがこのテキストをそのまま音声化したため、「404notfound」と読み上げられていた。
+
+#### 根本原因の発見プロセス
+
+1. **サーバーログ確認**:
+   ```
+   [200] GET /audio/ai-agents-70-percent-failure-reality-2025/article_ja-normal.mp3 - audio/mpeg
+   ```
+   → HTTPステータスは正常（404エラーではない）
+
+2. **音声ファイル形式確認**:
+   ```bash
+   $ file audio/ai-agents-70-percent-failure-reality-2025/article_ja-normal.mp3
+   MPEG ADTS, layer III, v2, 64 kbps, 24 kHz, Monaural
+   ```
+   → 音声ファイルは正常なMP3形式
+
+3. **記事ファイル内容確認**:
+   ```bash
+   $ cat articles/ai-agents-70-percent-failure-reality-2025.md
+   404: Not Found
+   ```
+   → **記事ファイルが404テキストのみだった（真因発見）**
+
+4. **Git履歴確認**:
+   - `feature/article-audio-reader`ブランチ: 記事ファイルが「404: Not Found」のみ
+   - `master`ブランチ: 正しい記事内容（170行、6398文字）が存在
+
+#### 解決手順
+
+```bash
+# 1. masterブランチから正しい記事内容を取得
+$ git checkout feature/article-audio-reader
+$ rm articles/ai-agents-70-percent-failure-reality-2025.md
+$ git show master:articles/ai-agents-70-percent-failure-reality-2025.md > articles/ai-agents-70-percent-failure-reality-2025.md
+
+# 2. 記事内容確認
+$ cat articles/ai-agents-70-percent-failure-reality-2025.md | wc -l
+170
+
+# 3. 音声ファイル再生成
+$ cd audio-reader
+$ python scripts/gtts_article_to_speech.py ../articles/ai-agents-70-percent-failure-reality-2025.md ja-normal
+
+# 出力:
+# 記事読み込み: ../articles/ai-agents-70-percent-failure-reality-2025.md
+# 話者: 日本語（標準） (ja-normal)
+# 抽出したテキスト長: 6398文字  ← 修正前は14文字のみ
+# 音声生成中...
+# [OK] 音声ファイル生成完了: article_ja-normal.mp3
+
+# 4. ブラウザでリフレッシュ（Ctrl+Shift+R）して動作確認
+# → 正しい記事内容が音声で再生されることを確認
+```
+
+#### 修正コミット
+
+```bash
+$ git add articles/ai-agents-70-percent-failure-reality-2025.md
+$ git add audio-reader/audio/ai-agents-70-percent-failure-reality-2025/
+$ git commit -m "記事ファイル404エラー修正 - masterブランチから正しい記事内容を取得・音声再生成"
+```
+
+#### 教訓
+
+1. **HTTPステータスコード200 ≠ 正常動作**
+   - ファイルは正常に配信されていても、内容が誤っている場合がある
+   - 音声ファイルの「内容」も確認が必要
+
+2. **パス修正は不要だった**
+   - `../audio/` → `/audio/` の変更は実際には不要（サーバーログで200 OK確認済み）
+   - パス問題と誤診したため、不要な修正を実施してしまった
+
+3. **テキスト抽出ログの重要性**
+   - gTTSの出力「抽出したテキスト長: 14文字」が真因のヒントだった
+   - 正常な記事なら数千文字あるはずだが、14文字（「404: Not Found」= 14文字）だった
+
+4. **Git履歴の活用**
+   - 異なるブランチで内容が異なる可能性を常に考慮
+   - masterブランチに正しい内容があることを確認し、そこから復旧
+
+#### 今後の予防策
+
+1. **音声生成前の記事ファイル検証**:
+   ```python
+   def validate_article(markdown):
+       if len(markdown) < 100:
+           raise ValueError(f"記事ファイルが短すぎます（{len(markdown)}文字）。正しい記事内容か確認してください。")
+       if markdown.strip() == "404: Not Found":
+           raise ValueError("記事ファイルが404エラーテキストのみです。")
+   ```
+
+2. **抽出テキスト長の警告**:
+   ```python
+   text = extract_text_from_markdown(markdown)
+   if len(text) < 100:
+       print(f"⚠️  警告: 抽出されたテキストが短すぎます（{len(text)}文字）")
+       print("記事ファイルの内容を確認してください。")
+   ```
+
+3. **複数ブランチでの作業時の注意**:
+   - 記事ファイルの内容が各ブランチで異なる可能性を常に考慮
+   - 音声生成前に記事ファイルの内容を目視確認
+
+---
+
+### 2025-11-08 22:35: 根本原因の追加調査結果
+
+**🚨 Critical: 記事ファイル破損の真の原因を特定**
+
+#### Git履歴詳細調査
+
+```bash
+$ git show 4e5caa8 --stat
+commit 4e5caa83a1700f121d4b49bccc81d864db21b6b7
+Author: Tenormusica2024 <dragonrondo@gmail.com>
+Date:   Sat Nov 8 21:45:48 2025 +0900
+
+    機能追加: 記事一覧表示と切り替え機能実装
+    
+ articles/ai-agents-70-percent-failure-reality-2025.md   | 171 +--------------------
+ audio-reader/audio/ai-agents-70-percent-failure-reality-2025/
+ audio-reader/web/audio-player.html                 | 150 +++++++++++-------
+ 4 files changed, 103 insertions(+), 229 deletions(-)
+```
+
+#### 原因分析
+
+**コミットメッセージと実態の不一致:**
+- コミットメッセージ: 「新記事追加」
+- 実際の変更: **171行の削除 (-171)**
+- この時点で記事ファイルは「404: Not Found」のみに破損していた
+
+**破損の発生経緯（推定）:**
+1. 音声生成プロセス実行中に何らかのエラーが発生
+2. 記事ファイルが「404: Not Found」で上書きされた（原因不明）
+3. 破損した状態で`git add articles/ai-agents-70-percent-failure-reality-2025.md`実行
+4. 本来は`audio-reader/`配下のみをaddすべきだったが、`articles/`も含めてしまった
+5. `git diff`での変更内容確認を怠り、そのままコミット
+
+**なぜ検知できなかったか:**
+- `git status`実行時に`articles/`ディレクトリの変更を見逃した
+- `git diff --stat`で「-171行」という異常な削除を確認しなかった
+- コミットメッセージが実際の変更内容と一致していないことに気づかなかった
+
+#### 重要な教訓（追加）
+
+5. **`git add`実行前の必須確認**:
+   - 必ず`git status`と`git diff --stat`で変更内容を確認
+   - 大量の削除（-171行）は**異常サイン**
+   - コミットメッセージと実際の変更が一致しているか確認
+
+6. **記事ファイルへの書き込み禁止**:
+   - 音声生成スクリプトは記事ファイルを読み取り専用で開く
+   - 記事ファイルへの書き込みは一切行わない設計にする
+
+7. **articlesディレクトリの変更ルール**:
+   - `articles/`は基本的にmasterブランチでのみ変更
+   - feature branchで変更する場合は必ず意図的な変更か確認
+
+#### 改善策（実装必須）
+
+**4. Git commit前チェックリスト**:
+```bash
+# コミット前の必須確認手順
+git status                    # どのファイルが変更されたか確認
+git diff --stat              # 各ファイルの変更行数統計を確認
+git diff articles/           # articlesディレクトリの変更内容を詳細確認
+
+# 意図しない削除がある場合は中止
+# 例: "171 deletions" という大量削除は異常サイン
+```
+
+**5. 記事ファイル書き込み防止（実装必須）**:
+```python
+# gtts_article_to_speech.py
+# ❌ 間違い: 書き込みモードで開く
+# with open(article_path, 'w', encoding='utf-8') as f:
+
+# ✅ 正しい: 読み取り専用で開く
+with open(article_path, 'r', encoding='utf-8') as f:
+    content = f.read()
+
+# 記事ファイルへの書き込みは絶対に行わない
+```
+
+**6. articlesディレクトリの保護**:
+- `.gitignore`では対応不可（意図的に管理対象）
+- Git hookで`articles/`の変更を検出し、警告を表示
+- CI/CDで意図しない変更を検出する仕組み
+
+#### 再発防止の追加策
+
+**レビュー時の必須確認項目:**
+1. コミットメッセージと`git diff --stat`の一致確認
+2. 大量削除（-100行以上）の有無確認
+3. `articles/`ディレクトリへの意図しない変更確認
+4. 記事ファイルの内容が正常か目視確認（`head`コマンド等）
+
+**今回の失敗が教えてくれたこと:**
+- 対症療法（記事ファイル復元）だけでは不十分
+- **なぜ破損したのか**まで追求しないと再発する
+- Git historyは真実を語る - 必ず確認すべき
+- コミットメッセージと実態の不一致は**重大な警告サイン**
+
+---
+
+## 更新履歴（追記）
+
+| 日付 | バージョン | 内容 |
+|------|----------|------|
+| 2025-11-08 | v1.0.0 | 初版作成（gTTS導入完了） |
+| 2025-11-08 | v1.1.0 | 本質的エラーハンドリング実装（タイムアウト・リトライ・部分的成功処理追加） |
+| 2025-11-08 | v1.1.1 | 記事ファイル404エラー修正対応（詳細は上記「エラー対応ログ」参照） |
+| 2025-11-08 | v1.1.2 | 根本原因追加調査完了（Git履歴分析・コミット不整合検出・再発防止策追加） |
+| 2025-11-08 | v1.1.3 | 記事検証機能実装完了（再発防止策の実装） |
+
+---
+
+### 2025-11-08 23:15: 記事検証機能の実装完了
+
+**🎯 code-reviewerの指摘に基づく再発防止策の実装**
+
+#### 実装内容
+
+**1. 記事内容検証関数の追加（gtts_article_to_speech.py）:**
+```python
+def validate_article_content(markdown, article_path):
+    """記事ファイルの内容を検証（破損検出）"""
+    
+    # 最小文字数チェック
+    if len(markdown) < 500:
+        raise ValueError(
+            f"[エラー] 記事ファイルが短すぎます（{len(markdown)}文字）\n"
+            f"正常な記事は通常500文字以上あります。\n"
+            f"ファイル: {article_path}"
+        )
+    
+    # 404エラーテキストチェック
+    if markdown.strip() == "404: Not Found":
+        raise ValueError(
+            f"[エラー] 記事ファイルが404エラーテキストのみです\n"
+            f"正しい記事内容を確認してください。\n"
+            f"ファイル: {article_path}"
+        )
+    
+    # frontmatterの存在確認
+    if not markdown.startswith("---"):
+        raise ValueError(
+            f"[エラー] 記事ファイルがfrontmatterで始まっていません\n"
+            f"Zenn記事は '---' で始まる必要があります。\n"
+            f"ファイル: {article_path}"
+        )
+    
+    print(f"[OK] 記事ファイル検証: 正常")
+```
+
+**2. 音声生成プロセスへの統合:**
+```python
+def generate_audio(article_path, output_dir, voice_key=DEFAULT_VOICE):
+    # マークダウン読み込み
+    with open(article_path, 'r', encoding='utf-8') as f:
+        markdown = f.read()
+    
+    # 記事内容の検証（破損検出）← 追加
+    validate_article_content(markdown, article_path)
+    
+    text = extract_text_from_markdown(markdown)
+    print(f"抽出したテキスト長: {len(text)}文字")
+    
+    # 抽出テキストの長さ警告← 追加
+    if len(text) < 1000:
+        print(f"[警告] 抽出テキストが短すぎます（{len(text)}文字）")
+        print(f"正常な記事からは通常1000文字以上のテキストが抽出されます")
+```
+
+#### 動作確認結果
+
+**正常な記事ファイルでのテスト:**
+```bash
+$ python gtts_article_to_speech.py ai-agents-70-percent-failure-reality-2025.md
+記事読み込み: C:\Users\Tenormusica\Documents\zenn-ai-news\articles\ai-agents-70-percent-failure-reality-2025.md
+話者: 日本語（標準） (ja-normal)
+[OK] 記事ファイル検証: 正常
+抽出したテキスト長: 6398文字
+音声生成中...
+[OK] 音声ファイル生成完了: article_ja-normal.mp3
+```
+
+**破損ファイルでのテスト:**
+```bash
+$ echo "404: Not Found" > test_corrupted_article.md
+$ python gtts_article_to_speech.py test_corrupted_article.md
+記事読み込み: C:\Users\Tenormusica\test_corrupted_article.md
+話者: 日本語（標準） (ja-normal)
+[エラー] 記事ファイルが短すぎます（15文字）
+正常な記事は通常500文字以上あります。
+ファイル: C:\Users\Tenormusica\test_corrupted_article.md
+ValueError: [エラー] 記事ファイルが短すぎます（15文字）
+→ 処理停止（音声生成されない）
+```
+
+#### 実装の効果
+
+1. **早期検出**: 記事ファイル読み込み直後に破損を検出
+2. **明確なエラーメッセージ**: 何が問題かを具体的に表示
+3. **処理停止**: 破損ファイルで音声生成を実行しない
+4. **再発防止**: 今回のような「404: Not Found」の記事を検出できる
+
+#### 今後の拡張案
+
+- [ ] 記事タイトルの検証（空でないこと）
+- [ ] emoji、type、topicsなどのfrontmatter必須項目チェック
+- [ ] 本文の最小行数チェック（例: 10行以上）
+- [ ] Markdownの構文エラー検出
 
 ---
 
