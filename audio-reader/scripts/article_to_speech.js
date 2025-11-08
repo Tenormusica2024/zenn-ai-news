@@ -76,58 +76,73 @@ function splitIntoChunks(text, maxLength = 1000) {
 }
 
 // HTTP リクエストヘルパー（タイムアウト・リトライ対応）
-function httpRequest(url, options = {}, binary = false, timeout = 30000, retries = 3) {
-  return new Promise(async (resolve, reject) => {
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const result = await new Promise((resolveInner, rejectInner) => {
-          const req = http.request(url, {
-            method: options.method || 'GET',
-            headers: options.headers || {},
-            timeout: timeout
-          }, (res) => {
-            const chunks = [];
-            res.on('data', chunk => chunks.push(chunk));
-            res.on('end', () => {
-              if (res.statusCode !== 200) {
-                rejectInner(new Error(`HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString()}`));
-                return;
-              }
-              if (binary) {
-                resolveInner(Buffer.concat(chunks));
-              } else {
-                resolveInner(Buffer.concat(chunks).toString());
-              }
-            });
+async function httpRequest(url, options = {}, binary = false, timeout = 30000, retries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await new Promise((resolve, reject) => {
+        let completed = false;
+        
+        const cleanup = () => {
+          completed = true;
+          req.removeAllListeners();
+        };
+        
+        const handleError = (error) => {
+          if (completed) return;
+          cleanup();
+          reject(error);
+        };
+        
+        const req = http.request(url, {
+          method: options.method || 'GET',
+          headers: options.headers || {},
+          timeout: timeout
+        }, (res) => {
+          const chunks = [];
+          
+          res.on('data', chunk => chunks.push(chunk));
+          
+          res.on('end', () => {
+            if (completed) return;
+            cleanup();
+            
+            if (res.statusCode !== 200) {
+              reject(new Error(`HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString()}`));
+              return;
+            }
+            
+            const result = binary ? Buffer.concat(chunks) : Buffer.concat(chunks).toString();
+            resolve(result);
           });
           
-          req.on('error', rejectInner);
-          req.on('timeout', () => {
-            req.destroy();
-            rejectInner(new Error(`Request timeout after ${timeout}ms`));
-          });
-          
-          if (options.body) {
-            req.write(options.body);
-          }
-          
-          req.end();
+          res.on('error', handleError);
         });
         
-        return resolve(result);
-      } catch (error) {
-        lastError = error;
-        if (attempt < retries) {
-          console.log(`リトライ ${attempt}/${retries}: ${error.message}`);
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        req.on('error', handleError);
+        req.on('timeout', () => {
+          if (completed) return;
+          req.destroy();
+          handleError(new Error(`Request timeout after ${timeout}ms`));
+        });
+        
+        if (options.body) {
+          req.write(options.body);
         }
+        
+        req.end();
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        console.log(`リトライ ${attempt}/${retries}: ${error.message}`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
-    
-    reject(new Error(`Failed after ${retries} attempts: ${lastError.message}`));
-  });
+  }
+  
+  throw new Error(`Failed after ${retries} attempts: ${lastError.message}`);
 }
 
 // テキストを音声に変換
@@ -158,12 +173,37 @@ async function textToSpeech(text, speakerId) {
 
 // WAVファイルを結合（シンプルな連結）
 function concatenateWavBuffers(buffers) {
+  // バリデーション
+  if (!buffers || buffers.length === 0) {
+    throw new Error('WAV結合エラー: 空のバッファ配列');
+  }
+  
+  if (buffers.some(buf => !Buffer.isBuffer(buf))) {
+    throw new Error('WAV結合エラー: 不正なバッファ型');
+  }
+  
+  if (buffers.some(buf => buf.length < 44)) {
+    throw new Error('WAV結合エラー: WAVヘッダーサイズ不足（44バイト未満）');
+  }
+  
+  // WAVファイルの"RIFF"ヘッダー確認
+  const firstBuffer = buffers[0];
+  const riffHeader = firstBuffer.toString('ascii', 0, 4);
+  if (riffHeader !== 'RIFF') {
+    throw new Error(`WAV結合エラー: 不正なRIFFヘッダー（${riffHeader}）`);
+  }
+  
   // 最初のWAVヘッダーを取得
-  const firstHeader = buffers[0].slice(0, 44);
+  const firstHeader = firstBuffer.slice(0, 44);
   
   // 全データ部分を結合
   const dataChunks = buffers.map(buf => buf.slice(44));
   const totalDataSize = dataChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  
+  // 32bit整数オーバーフロー確認
+  if (totalDataSize > 0xFFFFFFFF - 36) {
+    throw new Error(`WAV結合エラー: ファイルサイズが4GB制限を超過（${totalDataSize}バイト）`);
+  }
   
   // 新しいWAVヘッダーを作成（データサイズを更新）
   const header = Buffer.from(firstHeader);
@@ -219,13 +259,21 @@ async function createArticleAudio(articlePath, outputDir, speakerKey) {
       failedChunks.push(i + 1);
       
       // 3個以上連続で失敗した場合は中断
-      if (failedChunks.length >= 3 && failedChunks.slice(-3).every((v, idx) => v === i + 1 - 2 + idx)) {
-        console.error('\n3個以上のチャンクが連続で失敗しました。処理を中断します。');
-        if (audioBuffers.length > 0) {
-          console.log(`\n部分的に生成された音声（${audioBuffers.length}チャンク）を保存します...`);
-          break;
-        } else {
-          throw new Error('音声生成に失敗しました');
+      if (failedChunks.length >= 3) {
+        const lastThreeIndices = failedChunks.slice(-3);
+        const isConsecutive = lastThreeIndices.every((val, idx) => {
+          if (idx === 0) return true;
+          return val === lastThreeIndices[idx - 1] + 1;
+        });
+        
+        if (isConsecutive) {
+          console.error('\n3個以上のチャンクが連続で失敗しました。処理を中断します。');
+          if (audioBuffers.length > 0) {
+            console.log(`\n部分的に生成された音声（${audioBuffers.length}チャンク）を保存します...`);
+            break;
+          } else {
+            throw new Error('音声生成に失敗しました');
+          }
         }
       }
     }
