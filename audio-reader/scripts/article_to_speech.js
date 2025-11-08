@@ -6,7 +6,16 @@ const path = require('path');
 const http = require('http');
 
 const VOICEVOX_API = 'http://localhost:50021';
-const SPEAKER_ID = 13; // 青山龍星（ノーマル）
+
+// 利用可能な話者リスト
+const AVAILABLE_SPEAKERS = {
+  'zundamon': { id: 3, name: 'ずんだもん（ノーマル）', description: '親しみやすい声' },
+  'no7-reading': { id: 31, name: 'No.7（読み聞かせ）', description: '朗読に特化した落ち着いた男性声' },
+  'aoyama-calm': { id: 84, name: '青山龍星（しっとり）', description: '落ち着いた朗読向け男性声' }
+};
+
+// デフォルトの話者（コマンドライン引数で変更可能）
+const DEFAULT_SPEAKER = 'no7-reading';
 
 // マークダウンから本文を抽出（frontmatterと特殊記法を除去）
 function extractTextFromMarkdown(markdown) {
@@ -136,8 +145,10 @@ function concatenateWavBuffers(buffers) {
 }
 
 // 記事全体を1つの音声ファイルとして生成
-async function createArticleAudio(articlePath, outputDir) {
+async function createArticleAudio(articlePath, outputDir, speakerKey) {
+  const speaker = AVAILABLE_SPEAKERS[speakerKey];
   console.log(`記事読み込み: ${articlePath}`);
+  console.log(`話者: ${speaker.name} (ID: ${speaker.id})`);
   
   // マークダウンファイル読み込み
   const markdown = fs.readFileSync(articlePath, 'utf-8');
@@ -153,7 +164,7 @@ async function createArticleAudio(articlePath, outputDir) {
   const audioBuffers = [];
   for (let i = 0; i < chunks.length; i++) {
     console.log(`[${i + 1}/${chunks.length}] 音声生成中...`);
-    const audioData = await textToSpeech(chunks[i], SPEAKER_ID);
+    const audioData = await textToSpeech(chunks[i], speaker.id);
     audioBuffers.push(audioData);
     
     // API負荷軽減のため少し待機
@@ -164,8 +175,8 @@ async function createArticleAudio(articlePath, outputDir) {
   console.log(`\n音声ファイルを結合中...`);
   const combinedAudio = concatenateWavBuffers(audioBuffers);
   
-  // 1つのファイルとして保存
-  const filename = 'article.wav';
+  // 1つのファイルとして保存（話者名を含む）
+  const filename = `article_${speakerKey}.wav`;
   const filepath = path.join(outputDir, filename);
   fs.writeFileSync(filepath, combinedAudio);
   
@@ -175,6 +186,8 @@ async function createArticleAudio(articlePath, outputDir) {
   // プレイリスト情報を保存
   const playlist = {
     article: path.basename(articlePath),
+    speaker: speakerKey,
+    speakerName: speaker.name,
     chunks: [filename],
     totalChunks: 1,
     createdAt: new Date().toISOString()
@@ -191,10 +204,21 @@ async function createArticleAudio(articlePath, outputDir) {
 // メイン処理
 async function main() {
   const articlePath = process.argv[2];
+  const speakerKey = process.argv[3] || DEFAULT_SPEAKER;
   
   if (!articlePath) {
-    console.error('使用方法: node article_to_speech.js <記事のパス>');
-    console.error('例: node article_to_speech.js ../articles/affinity-3-free-canva-ai-strategy-2025.md');
+    console.error('使用方法: node article_to_speech.js <記事のパス> [話者キー]');
+    console.error('例: node article_to_speech.js ../articles/affinity-3-free-canva-ai-strategy-2025.md no7-reading');
+    console.error('\n利用可能な話者:');
+    Object.entries(AVAILABLE_SPEAKERS).forEach(([key, speaker]) => {
+      console.error(`  ${key}: ${speaker.name} - ${speaker.description}`);
+    });
+    process.exit(1);
+  }
+  
+  if (!AVAILABLE_SPEAKERS[speakerKey]) {
+    console.error(`エラー: 不明な話者キー: ${speakerKey}`);
+    console.error('利用可能な話者:', Object.keys(AVAILABLE_SPEAKERS).join(', '));
     process.exit(1);
   }
   
@@ -212,7 +236,7 @@ async function main() {
   }
   
   try {
-    await createArticleAudio(articlePath, outputDir);
+    await createArticleAudio(articlePath, outputDir, speakerKey);
   } catch (error) {
     console.error('エラー:', error.message);
     process.exit(1);

@@ -71,8 +71,9 @@
       background-clip: text;
       font-size: 1.5rem;
       font-weight: 700;
-      margin-bottom: 0;
+      margin-bottom: 1.5rem;
       letter-spacing: -0.01em;
+      text-align: center;
     }
     
     .container {
@@ -264,6 +265,35 @@
       background: rgba(30, 30, 30, 0.8);
     }
     
+    .voice-control {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .voice-control label {
+      font-size: 14px;
+      color: #999;
+    }
+    
+    .voice-control select {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(20, 20, 20, 0.8);
+      color: #ffffff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .voice-control select:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(30, 30, 30, 0.8);
+    }
+    
     @media (max-width: 768px) {
       body {
         padding: 1rem 0.5rem;
@@ -291,11 +321,11 @@
 <body>
   <div class="header">
     <h1>🎙️ Zenn記事音声朗読</h1>
-    <p class="article-title" id="articleTitle">読み込み中...</p>
   </div>
   
   <div class="container">
     <div class="player">
+      <p class="article-title" id="articleTitle">読み込み中...</p>
       <img src="/web/affinity-thumbnail.jpg" alt="Article Thumbnail" class="thumbnail">
       
       <div class="progress-container" id="progressContainer">
@@ -326,6 +356,15 @@
           <option value="2">2.0x</option>
         </select>
       </div>
+      
+      <div class="voice-control">
+        <label for="voiceSelect">ナレーター:</label>
+        <select id="voiceSelect">
+          <option value="no7-reading" selected>No.7（読み聞かせ）</option>
+          <option value="aoyama-calm">青山龍星（しっとり）</option>
+          <option value="zundamon">ずんだもん（ノーマル）</option>
+        </select>
+      </div>
     </div>
     
     <div class="chunk-list" id="chunkList">
@@ -348,9 +387,11 @@
     const chunkList = document.getElementById('chunkList');
     const articleTitle = document.getElementById('articleTitle');
     const speedSelect = document.getElementById('speedSelect');
+    const voiceSelect = document.getElementById('voiceSelect');
     
     let playlist = null;
     let currentChunkIndex = 0;
+    let currentVoice = 'no7-reading';
     const audioBasePath = '../audio/affinity-3-free-canva-ai-strategy-2025/';
     
     // プレイリスト読み込み
@@ -398,7 +439,8 @@
       if (index < 0 || index >= playlist.totalChunks) return;
       
       currentChunkIndex = index;
-      audio.src = audioBasePath + playlist.chunks[index];
+      const filename = `article_${currentVoice}.wav`;
+      audio.src = audioBasePath + filename;
       updateChunkInfo();
       updateButtons();
       renderChunkList();
@@ -482,6 +524,22 @@
     // 再生速度変更
     speedSelect.addEventListener('change', () => {
       audio.playbackRate = parseFloat(speedSelect.value);
+    });
+    
+    // ナレーター変更
+    voiceSelect.addEventListener('change', () => {
+      currentVoice = voiceSelect.value;
+      const wasPlaying = !audio.paused;
+      const currentTime = audio.currentTime;
+      
+      loadChunk(currentChunkIndex);
+      
+      audio.addEventListener('loadedmetadata', () => {
+        audio.currentTime = currentTime;
+        if (wasPlaying) {
+          audio.play();
+        }
+      }, { once: true });
     });
     
     // 初期化
