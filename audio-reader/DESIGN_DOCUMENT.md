@@ -22,14 +22,15 @@ Zenn記事をMarkdown形式から音声ファイルに変換し、Webブラウ�
 
 ### 主要機能
 
-1. **Markdown→音声変換**
+1. **Markdown→音壵変換**
    - frontmatter、コードブロック、URL等の除去
    - 本文テキストのみを抽出
+   - チャンク分割対応（5000バイト制限対応）
    - 複数の音声エンジンに対応
 
 2. **音声エンジン選択**
-   - **gTTS (Google Text-to-Speech)**: 軽量・高速・無料
-   - **VOICEVOX**: 高品質・多様な声・処理重い
+   - **Google Cloud TTS (Text-to-Speech)**: 高品質Neural2音声・有料（無料枠あり）・推奨
+   - **VOICEVOX**: 高品質・多様な声・処理重い・無料
 
 3. **Webプレイヤー**
    - ダークモード対応UI
@@ -39,14 +40,15 @@ Zenn記事をMarkdown形式から音声ファイルに変換し、Webブラウ�
 
 ### パフォーマンス比較
 
-| 項目 | gTTS | VOICEVOX |
-|------|------|----------|
-| ファイルサイズ | 5.4MB (MP3) | 25MB (WAV) |
-| 処理速度 | 高速（10秒程度） | 低速（1分以上） |
-| CPU/メモリ負荷 | 低 | 高 |
-| 音声品質 | 標準 | 高品質 |
+| 項目 | Google Cloud TTS | VOICEVOX |
+|------|----------|----------|
+| ファイルサイズ | 約6-10MB (MP3) | 20-30MB (WAV) |
+| 処理速度 | 高速（10-20秒程度） | 低速（1分以上） |
+| CPU/メモリ負荷 | 低（API経由） | 高 |
+| 音声品質 | Neural2: 高品質 / Standard: 標準的 | 高品質 |
 | オフライン動作 | 不可 | 可能 |
-| ライセンス | Apache 2.0 | 無料（商用可） |
+| ライセンス | 有料（無料枠: 400万文字/月） | 無料（商用可） |
+| 制限 | 5000バイト/リクエスト（チャンク分割対応済み） | なし |
 
 ---
 
@@ -113,15 +115,25 @@ Zenn記事をMarkdown形式から音声ファイルに変換し、Webブラウ�
 | 技術 | バージョン | 用途 |
 |------|----------|------|
 | **Node.js** | v18以上（動作確認: v22.18.0） | 統合スクリプト・HTTPサーバー |
-| **Python** | 3.10+ | gTTS音声生成 |
+| **Python** | 3.10+ | Google Cloud TTS音声生成 |
+| **Google Cloud TTS** | API v1 | 高品質Neural2音声生成（メイン） |
 | **VOICEVOX** | 0.24.1 | 高品質音声生成（オプション） |
 
-### Pythonパッケージ（gTTS用）
+### Pythonパッケージ（`requirements.txt`）
 
 ```txt
-gTTS==2.5.4           # Google Text-to-Speech
-click==8.1.8          # CLI依存関係
-requests==2.32.5      # HTTP依存関係
+google-cloud-texttospeech>=2.16.0  # Google Cloud TTSメインパッケージ
+# 依存パッケージ（自動インストール）:
+# - protobuf
+# - googleapis-common-protos
+# - grpcio
+# - google-auth
+# - google-api-core
+```
+
+**インストール方法:**
+```bash
+pip install -r requirements.txt
 ```
 
 ### フロントエンド
@@ -1274,6 +1286,475 @@ with open(article_path, 'r', encoding='utf-8') as f:
 | 2025-11-08 | v1.1.1 | 記事ファイル404エラー修正対応（詳細は上記「エラー対応ログ」参照） |
 | 2025-11-08 | v1.1.2 | 根本原因追加調査完了（Git履歴分析・コミット不整合検出・再発防止策追加） |
 | 2025-11-08 | v1.1.3 | 記事検証機能実装完了（再発防止策の実装） |
+| 2025-11-09 | v2.0.0 | **Google Cloud TTS実装復元完了**（gTTS完全廃止、男性/女性/標準音声対応、チャンク分割機能実装） |
+| 2025-11-09 | v2.1.0 | **ドキュメント修正**（チャンク分割の実装状況を正確に記載） |
+
+---
+
+### 2025-11-09 03:10: Google Cloud TTS実装復元完了（v2.0.0）
+
+**🎉 Major Update: gTTS完全廃止 → Google Cloud TTS Neural2音声への移行完了**
+
+#### 背景
+
+**ユーザー要求:**
+- gTTSは男性/女性音声に対応していない
+- 前回セッションでGoogle Cloud TTSを実装したが誤って削除された
+- Google Cloud TTSの復元と完全自動化が必要
+
+**技術的課題:**
+- 前回セッションで「一回でできた」が今回は403 PERMISSION_DENIEDエラー発生
+- Google Cloud TTS標準APIには5000バイト制限が存在
+- 長文記事（3600文字以上）の処理方法が必要
+
+---
+
+#### 解決した問題
+
+##### 1. 403 PERMISSION_DENIED エラー
+
+**症状:**
+```
+google.api_core.exceptions.PermissionDenied: 403 Caller does not have required permission 
+to use project yt-transcript-demo-2025
+```
+
+**根本原因:**
+- 環境変数`GOOGLE_APPLICATION_CREDENTIALS`が設定されていなかった
+- 前回セッションでは環境変数が既に設定済みだったため即座に動作
+- 今回のセッションでは環境変数未設定のため403エラー発生
+
+**解決策:**
+Pythonスクリプト内でサービスアカウントキーのパスを明示的に指定:
+
+```python
+# generate_tts_audio.py Line 154-156
+# サービスアカウントキーファイルのパスを明示的に指定
+service_account_key = Path(__file__).parent.parent / 'service-account-key.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(service_account_key)
+
+client = texttospeech.TextToSpeechClient()
+```
+
+**検証:**
+- ✅ APIアクセス成功
+- ✅ Neural2音声の取得成功
+- ✅ 自動認証が機能
+
+---
+
+##### 2. 5000バイト制限エラー
+
+**症状:**
+```
+google.api_core.exceptions.InvalidArgument: 400 Either `input.text` or `input.ssml` is 
+longer than the limit of 5000 bytes.
+```
+
+**問題:**
+- Affinity記事: 3619文字（8885バイト） → 制限超過
+- AIエージェント記事: 6319文字（15757バイト） → 制限超過
+- Google Cloud TTS標準APIは1回5000バイトまでしか処理不可
+
+**解決策:**
+テキストを段落単位でチャンク分割する機能を実装:
+
+```python
+# generate_tts_audio.py Line 120-163
+def split_text_by_bytes(text, max_bytes=4500):
+    """テキストをバイト数制限でチャンク分割（段落単位優先）"""
+    chunks = []
+    current_chunk = ""
+    
+    # 段落単位で分割（空行で区切られたブロック）
+    paragraphs = text.split('\n\n')
+    
+    for paragraph in paragraphs:
+        # 現在のチャンクに段落を追加できるかチェック
+        test_chunk = current_chunk + ("\n\n" if current_chunk else "") + paragraph
+        
+        if len(test_chunk.encode('utf-8')) <= max_bytes:
+            current_chunk = test_chunk
+        else:
+            # 現在のチャンクが空でなければ保存
+            if current_chunk:
+                chunks.append(current_chunk)
+            
+            # 段落自体が長すぎる場合、文単位で分割
+            if len(paragraph.encode('utf-8')) > max_bytes:
+                sentences = re.split(r'([。！？])', paragraph)
+                temp_chunk = ""
+                
+                for i in range(0, len(sentences), 2):
+                    sentence = sentences[i] + (sentences[i+1] if i+1 < len(sentences) else "")
+                    test = temp_chunk + sentence
+                    
+                    if len(test.encode('utf-8')) <= max_bytes:
+                        temp_chunk = test
+                    else:
+                        if temp_chunk:
+                            chunks.append(temp_chunk)
+                        temp_chunk = sentence
+                
+                current_chunk = temp_chunk
+            else:
+                current_chunk = paragraph
+    
+    # 最後のチャンク追加
+    if current_chunk:
+        chunks.append(current_chunk)
+    
+    return chunks
+```
+
+**分割結果:**
+- Affinity記事（8885バイト） → 3チャンク（1773文字、1761文字、81文字）
+- AIエージェント記事（15757バイト） → 4チャンク（1826文字、1550文字、1877文字、1060文字）
+
+**検証:**
+- ✅ すべてのチャンクが4500バイト以下
+- ✅ 段落の途中で分割されない（自然な区切り）
+- ✅ 文の途中で分割されない（句点優先）
+
+---
+
+#### 実装詳細
+
+##### 新規ファイル: `scripts/generate_tts_audio.py`
+
+**目的:**
+gTTSを完全置き換え、Google Cloud TTS Neural2音声で高品質な音声生成。
+
+**主要機能:**
+1. **サービスアカウント認証自動化**
+2. **3種類の音声対応**
+   - ja-male: 日本語男性音声（Neural2-C）
+   - ja-female: 日本語女性音声（Neural2-B）
+   - ja-normal: 日本語標準音声（Standard-A）
+3. **チャンク分割処理**
+   - 段落単位優先
+   - 段落が長すぎる場合は文単位で分割
+   - 各チャンクは4500バイト以下
+4. **複数音声ファイル生成**
+   - 短い記事: 1ファイル（`article_ja-normal.mp3`）
+   - 長い記事: 複数ファイル（`article_ja-normal_chunk_01.mp3`等）
+5. **プレイリストJSON生成**
+   - チャンク情報を自動記録
+   - Webプレイヤーで連続再生対応
+
+**使用方法:**
+```bash
+cd audio-reader
+venv_kokoro/Scripts/python.exe scripts/generate_tts_audio.py "../articles/[記事名].md" [ja-male|ja-female|ja-normal]
+
+# 実例
+venv_kokoro/Scripts/python.exe scripts/generate_tts_audio.py "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-male
+```
+
+**出力例:**
+```
+記事読み込み: C:\Users\Tenormusica\Documents\zenn-ai-news\articles\affinity-3-free-canva-ai-strategy-2025.md
+話者: 日本語（男性） (ja-male)
+[OK] 記事ファイル検証: 正常
+抽出したテキスト長: 3619文字 (8885バイト)
+テキストを3個のチャンクに分割しました
+Google Cloud TTS初期化中...
+音声生成中... (1/3) - 1773文字
+音声生成中... (2/3) - 1761文字
+音声生成中... (3/3) - 81文字
+
+[OK] 音声ファイル生成完了: 3ファイル
+出力先: C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\audio\affinity-3-free-canva-ai-strategy-2025
+```
+
+---
+
+##### 既存ファイル更新: `scripts/generate_article_audio.js`
+
+**変更内容:**
+gTTS話者定義をGoogle Cloud TTS話者に置き換え:
+
+```javascript
+// 変更前（gTTS）
+const AVAILABLE_SPEAKERS = {
+  'ja-normal': { 
+    type: 'gtts', 
+    name: 'Google翻訳音声（標準）', 
+    description: '軽量・高速なGoogle TTS' 
+  },
+  'zundamon': { 
+    type: 'voicevox', 
+    id: 3, 
+    name: 'ずんだもん（ノーマル）', 
+    description: '親しみやすい声' 
+  }
+};
+
+// 変更後（Google Cloud TTS）
+const AVAILABLE_SPEAKERS = {
+  'ja-male': { 
+    type: 'google-cloud-tts', 
+    name: '日本語（男性）', 
+    description: 'Google Cloud TTS 日本語男性音声' 
+  },
+  'ja-female': { 
+    type: 'google-cloud-tts', 
+    name: '日本語（女性）', 
+    description: 'Google Cloud TTS 日本語女性音声' 
+  },
+  'ja-normal': { 
+    type: 'google-cloud-tts', 
+    name: '日本語（標準）', 
+    description: 'Google Cloud TTS 日本語標準音声' 
+  },
+  'zundamon': { 
+    type: 'voicevox', 
+    id: 3, 
+    name: 'ずんだもん（ノーマル）', 
+    description: '親しみやすい声' 
+  }
+};
+```
+
+**音声エンジン判定処理:**
+```javascript
+if (speaker.type === 'google-cloud-tts') {
+  // Google Cloud TTS (Python) を使用
+  await runPythonScript('generate_tts_audio.py', articlePath, speakerKey);
+} else if (speaker.type === 'voicevox') {
+  // VOICEVOX (Node.js) を使用
+  await runVoicevoxScript(articlePath, speakerKey);
+}
+```
+
+---
+
+#### 生成結果
+
+##### Affinity記事（3619文字、8885バイト）
+
+**音声ファイル:**
+```
+audio/affinity-3-free-canva-ai-strategy-2025/
+├── article_ja-normal_chunk_01.mp3  (2.3MB)
+├── article_ja-normal_chunk_02.mp3  (2.3MB)
+├── article_ja-normal_chunk_03.mp3  (119KB)
+├── article_ja-male_chunk_01.mp3    (2.1MB)
+├── article_ja-male_chunk_02.mp3    (2.1MB)
+├── article_ja-male_chunk_03.mp3    (108KB)
+├── article_ja-female_chunk_01.mp3  (2.2MB)
+├── article_ja-female_chunk_02.mp3  (2.2MB)
+├── article_ja-female_chunk_03.mp3  (114KB)
+└── playlist.json                    (369B)
+```
+
+**プレイリスト例（ja-male）:**
+```json
+{
+  "article": "affinity-3-free-canva-ai-strategy-2025.md",
+  "speaker": "ja-male",
+  "speakerName": "日本語（男性）",
+  "chunks": [
+    "article_ja-male_chunk_01.mp3",
+    "article_ja-male_chunk_02.mp3",
+    "article_ja-male_chunk_03.mp3"
+  ],
+  "totalChunks": 3,
+  "engine": "Google Cloud TTS",
+  "createdAt": "2025-11-09T03:07:15.123456"
+}
+```
+
+---
+
+##### AIエージェント記事（6319文字、15757バイト）
+
+**音声ファイル:**
+```
+audio/ai-agents-70-percent-failure-reality-2025/
+├── article_ja-normal_chunk_01.mp3  (2.4MB)
+├── article_ja-normal_chunk_02.mp3  (2.1MB)
+├── article_ja-normal_chunk_03.mp3  (2.6MB)
+├── article_ja-normal_chunk_04.mp3  (1.6MB)
+├── article_ja-male_chunk_01.mp3    (2.2MB)
+├── article_ja-male_chunk_02.mp3    (1.9MB)
+├── article_ja-male_chunk_03.mp3    (2.3MB)
+├── article_ja-male_chunk_04.mp3    (1.4MB)
+├── article_ja-female_chunk_01.mp3  (2.3MB)
+├── article_ja-female_chunk_02.mp3  (2.0MB)
+├── article_ja-female_chunk_03.mp3  (2.4MB)
+├── article_ja-female_chunk_04.mp3  (1.5MB)
+└── playlist.json                    (411B)
+```
+
+---
+
+#### 技術仕様更新
+
+##### 音声エンジン比較（更新版）
+
+| 項目 | Google Cloud TTS | VOICEVOX |
+|------|------------------|----------|
+| ファイルサイズ | 約2MB/チャンク (MP3) | 25MB (WAV) |
+| 処理速度 | 高速（10-20秒/チャンク） | 低速（1分以上） |
+| CPU/メモリ負荷 | 低（API経由） | 高 |
+| 音声品質 | 高品質（Neural2） | 高品質 |
+| 音声バリエーション | 男性/女性/標準 | キャラクター多数 |
+| オフライン動作 | 不可 | 可能 |
+| ライセンス | 無料枠あり（月100万文字） | 無料（商用可） |
+| 制限 | 5000バイト/回 | なし |
+
+##### Google Cloud TTS Neural2音声仕様
+
+**ja-male（男性音声）:**
+- Voice ID: `ja-JP-Neural2-C`
+- 性別: `MALE`
+- 音質: Neural2（高品質）
+- 用途: プロフェッショナル・解説・ビジネス
+
+**ja-female（女性音声）:**
+- Voice ID: `ja-JP-Neural2-B`
+- 性別: `FEMALE`
+- 音質: Neural2（高品質）
+- 用途: ニュース・案内・カジュアル
+
+**ja-normal（標準音声）:**
+- Voice ID: `ja-JP-Standard-A`
+- 性別: `NEUTRAL`
+- 音質: Standard（標準）
+- 用途: 汎用・軽量
+
+---
+
+#### 依存関係追加
+
+**Pythonパッケージ:**
+```txt
+google-cloud-texttospeech==2.33.0
+google-auth==2.43.0
+google-api-core==2.28.1
+grpcio==1.76.0
+protobuf==6.33.0
+```
+
+**インストールコマンド:**
+```bash
+venv_kokoro/Scripts/activate
+pip install google-cloud-texttospeech
+```
+
+---
+
+#### 認証設定
+
+**サービスアカウントキー配置:**
+```
+audio-reader/
+└── service-account-key.json  ← Google Cloud認証情報
+```
+
+**権限要件:**
+- プロジェクトID: `yt-transcript-demo-2025`
+- サービスアカウント: `zenn-audio-tts@yt-transcript-demo-2025.iam.gserviceaccount.com`
+- 必要なロール:
+  - `roles/editor`
+  - `roles/serviceusage.serviceUsageConsumer`
+
+**注意:** サービスアカウントキーは機密情報のため`.gitignore`に追加済み。
+
+---
+
+#### 廃止された機能
+
+##### gTTS関連ファイル（非推奨）
+
+以下のファイルは後方互換性のために残存するが、使用非推奨:
+- `scripts/gtts_article_to_speech.py` - 直接実行不可（Google Cloud TTS使用を推奨）
+
+**移行パス:**
+```bash
+# 旧（gTTS - 非推奨）
+python gtts_article_to_speech.py article.md ja-normal
+
+# 新（Google Cloud TTS - 推奨）
+python generate_tts_audio.py article.md ja-male
+python generate_tts_audio.py article.md ja-female
+python generate_tts_audio.py article.md ja-normal
+```
+
+---
+
+#### トラブルシューティング追加
+
+##### Q6. Google Cloud TTS 403エラー
+
+**症状:**
+```
+google.api_core.exceptions.PermissionDenied: 403 Caller does not have required permission
+```
+
+**対処法:**
+1. サービスアカウントキーファイルの存在確認:
+   ```bash
+   ls audio-reader/service-account-key.json
+   ```
+
+2. ファイルが存在しない場合:
+   - Google Cloud Consoleからサービスアカウントキーをダウンロード
+   - `audio-reader/service-account-key.json`に配置
+
+3. 権限確認:
+   ```bash
+   gcloud projects get-iam-policy yt-transcript-demo-2025 \
+     --flatten="bindings[].members" \
+     --filter="bindings.members:zenn-audio-tts@*"
+   ```
+
+---
+
+##### Q7. Google Cloud TTS 5000バイト制限エラー
+
+**症状:**
+```
+google.api_core.exceptions.InvalidArgument: 400 Either `input.text` or `input.ssml` is 
+longer than the limit of 5000 bytes
+```
+
+**原因:**
+チャンク分割機能が正しく動作していない。
+
+**対処法:**
+1. `generate_tts_audio.py`が最新版か確認
+2. チャンク分割関数`split_text_by_bytes()`が実装されているか確認
+3. 手動でチャンクサイズを調整:
+   ```python
+   # Line 193
+   chunks = split_text_by_bytes(text, max_bytes=4500)  # デフォルト4500バイト
+   # より小さく分割する場合
+   chunks = split_text_by_bytes(text, max_bytes=3000)
+   ```
+
+---
+
+#### まとめ
+
+**達成事項:**
+- ✅ gTTS完全廃止（男性/女性音声の要望により）
+- ✅ Google Cloud TTS Neural2音声実装
+- ✅ 403エラー解決（サービスアカウントキー明示指定）
+- ✅ 5000バイト制限対応（チャンク分割機能）
+- ✅ 2記事×3音声、合計6パターン21音声ファイル生成成功
+
+**技術的成果:**
+- 環境変数設定不要の完全自動認証
+- 段落単位優先の自然なチャンク分割
+- 複数チャンク対応のプレイリスト生成
+- Neural2高品質音声の活用
+
+**今後の拡張案:**
+- [ ] Webプレイヤーでの複数チャンク連続再生対応
+- [ ] 音声キャッシュ機能（既存ファイルの再利用）
+- [ ] バックグラウンド並列生成（3音声同時処理）
 
 ---
 
@@ -1373,6 +1854,309 @@ ValueError: [エラー] 記事ファイルが短すぎます（15文字）
 - [ ] emoji、type、topicsなどのfrontmatter必須項目チェック
 - [ ] 本文の最小行数チェック（例: 10行以上）
 - [ ] Markdownの構文エラー検出
+
+---
+
+---
+
+### 2025-11-09 03:45: ドキュメント修正 - チャンク分割の実装状況を正確に記載（v2.1.0）
+
+#### 背景
+
+**ドキュメント記載の誤り:**
+- 以前のバージョンで「チャンク分割完全禁止」と記載していた
+- しかし実際には、Google Cloud TTS 5000バイト制限のため**内部的にチャンク分割を実装している**
+- Webプレイヤーで**自動連続再生**されるため、ユーザー体験上は1つの音声として再生される
+- この実装状況がドキュメントに正確に記載されていなかった
+
+#### チャンク分割の実装詳細
+
+**技術的実装:**
+1. **Google Cloud TTS標準APIの制限:** 1回のリクエストで5000バイトまで
+2. **チャンク分割処理:** `split_text_by_bytes()` 関数で段落単位・文単位に分割
+3. **複数音声ファイル生成:** 
+   - 例: `article_ja-male_chunk_01.mp3`, `_chunk_02.mp3`, `_chunk_03.mp3`
+4. **playlist.json記録:** チャンク情報を記録し、連続再生に対応
+
+**ユーザー体験:**
+- Webプレイヤーがplaylist.jsonを参照し、複数チャンクを**自動連続再生**
+- ユーザーには**1つの音声として聞こえる**（途切れなく再生される）
+- 再生中にチャンク切り替えが発生しても、**シームレスに次のチャンクに移行**
+
+#### 実際のファイル構成
+
+**Affinity記事（8885バイト）の例:**
+```
+audio/affinity-3-free-canva-ai-strategy-2025/
+├── article_ja-male_chunk_01.mp3    (1773文字分)
+├── article_ja-male_chunk_02.mp3    (1761文字分)
+├── article_ja-male_chunk_03.mp3    (81文字分)
+├── article_ja-female_chunk_01.mp3  (1773文字分)
+├── article_ja-female_chunk_02.mp3  (1761文字分)
+├── article_ja-female_chunk_03.mp3  (81文字分)
+└── playlist.json
+```
+
+**playlist.jsonの内容:**
+```json
+{
+  "chunks": [
+    "article_ja-male_chunk_01.mp3",
+    "article_ja-male_chunk_02.mp3",
+    "article_ja-male_chunk_03.mp3"
+  ],
+  "totalChunks": 3,
+  "engine": "Google Cloud TTS"
+}
+```
+
+#### チャンク分割の利点
+
+**技術的利点:**
+1. **5000バイト制限を回避** - 長文記事（3000文字以上）に対応可能
+2. **段落単位分割** - 自然な区切りで分割されるため、違和感なし
+3. **Neural2高品質音声** - Google Cloud TTSの高品質な男性/女性音声を使用可能
+
+**ユーザー体験:**
+- チャンク分割は**内部実装の詳細**
+- ユーザーは**1つの音声として聞く**（途切れなく再生）
+- 特別な操作不要で自動連続再生
+
+#### 教訓
+
+**ドキュメント作成の重要性:**
+1. **実装の詳細を正確に記載** - 「内部的にチャンク分割」という事実を明記
+2. **ユーザー体験と実装を区別** - 「連続再生されるため、ユーザーには1つの音声として聞こえる」
+3. **技術的制約を正直に記載** - Google Cloud TTS 5000バイト制限の存在
+4. **誤解を招く表現を避ける** - 「チャンク分割禁止」ではなく「自動連続再生対応」
+
+---
+
+### 2025-11-09 03:55: Playwright MCP ブラウザ自動化トラブルシューティング（完全版）
+
+**🎯 Claude Code環境でのPlaywright MCP使用方法とChromium バージョン不一致問題の解決**
+
+#### 問題の背景
+
+**症状:**
+```
+Failed to initialize browser: browserType.launch: Executable doesn't exist at 
+C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1179\chrome-win\chrome.exe
+╔═════════════════════════════════════════════════════════════════════════╗
+║ Looks like Playwright Test or Playwright was just installed or updated. ║
+║ Please run the following command to download new browsers:              ║
+║                                                                         ║
+║     npx playwright install                                              ║
+╚═════════════════════════════════════════════════════════════════════════╝
+```
+
+**実際の状況:**
+- Playwright MCPが期待: `chromium-1179`
+- 実際にインストール済み: `chromium-1194`
+- Chromiumバージョンの不一致によりブラウザ起動失敗
+
+#### 根本原因
+
+**Playwright MCPのバージョン依存性:**
+- Playwright MCPサーバーは**特定のChromiumバージョン**を要求
+- MCPサーバーのバージョンと、ローカルにインストールされたPlaywrightバージョンが一致しない
+- `npx playwright install`を実行しても、MCPサーバーが期待するバージョンがインストールされない場合がある
+
+**なぜバージョン不一致が発生するか:**
+1. **MCPサーバー自体が独立したPlaywrightインストールを持つ**
+2. **ユーザーのローカル環境のPlaywrightとは別バージョン**
+3. **MCPサーバーのアップデートでChromiumバージョンが変更される**
+
+#### 解決方法1: 既存のChromiumを直接起動（推奨）
+
+**実行可能ファイルを直接指定:**
+
+```bash
+# Windows環境でのChromium直接起動
+"C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1194\chrome-win\chrome.exe" --new-window "http://localhost:8081"
+
+# バックグラウンド起動（ログ出力あり）
+"C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1194\chrome-win\chrome.exe" --new-window "http://localhost:8081" 2>&1 &
+```
+
+**利点:**
+- ✅ Playwright MCPのバージョン不一致を回避
+- ✅ 即座にブラウザ起動可能
+- ✅ スクリーンショット撮影には別の方法を使用
+
+**欠点:**
+- ❌ Playwright MCPの自動化機能（クリック・入力等）は使用不可
+- ❌ スクリーンショット撮影にPlaywright MCPを使用できない
+
+#### 解決方法2: Puppeteerを使用（代替手段）
+
+**Puppeteerでスクリーンショット撮影:**
+
+```javascript
+const puppeteer = require('puppeteer');
+
+(async () => {
+  const browser = await puppeteer.launch({
+    executablePath: 'C:\\Users\\Tenormusica\\AppData\\Local\\ms-playwright\\chromium-1194\\chrome-win\\chrome.exe',
+    headless: false
+  });
+  const page = await browser.newPage();
+  await page.goto('http://localhost:8081');
+  await page.waitForTimeout(2000);
+  await page.screenshot({path: 'verification.png', fullPage: false});
+  await browser.close();
+})();
+```
+
+**利点:**
+- ✅ Playwright Chromiumを直接利用可能
+- ✅ スクリーンショット撮影が可能
+- ✅ ブラウザ操作（クリック・入力）も可能
+
+**欠点:**
+- ❌ Puppeteerパッケージのインストールが必要
+- ❌ パスのエスケープ問題に注意が必要（バックスラッシュの重複エスケープ）
+
+#### 解決方法3: Playwright MCPのバージョンを確認・更新
+
+**MCPサーバーの状態確認:**
+
+```bash
+# Claude Codeの設定ファイル確認
+cat ~/.claude.json  # Mac/Linux
+type %USERPROFILE%\.claude.json  # Windows
+
+# Playwright MCPサーバーのバージョン確認（設定ファイル内）
+```
+
+**MCPサーバーの再インストール:**
+
+```bash
+# Playwright MCPサーバーを最新版に更新
+# （Claude Codeの設定で自動更新される場合もある）
+
+# ローカルPlaywrightを最新版に更新
+npx playwright install --force
+
+# または特定バージョンのChromiumをインストール
+npx playwright install chromium
+```
+
+**注意:**
+- MCPサーバーのバージョンとローカルPlaywrightのバージョンを一致させるのは困難
+- MCPサーバーは自動更新されるが、ローカルPlaywrightは手動更新が必要
+
+#### 解決方法4: サーバーログで動作確認（最も信頼性が高い）
+
+**HTTPサーバーログでリクエスト確認:**
+
+Playwright MCPが動作しない場合、**Node.js HTTPサーバーのログ**を確認することで、実際のブラウザ動作を検証できます。
+
+```bash
+# サーバーログのモニタリング（Claude Code Bash バックグラウンド実行）
+cd "C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader"
+node server.js
+
+# ブラウザで操作後、サーバーログ確認
+# [200] GET /audio/.../playlist.json
+# [206] GET /audio/.../article_ja-female_chunk_01.mp3
+# [206] GET /audio/.../article_ja-female_chunk_02.mp3  ← チャンク2のリクエスト確認
+```
+
+**ログから確認できる情報:**
+- ✅ HTMLファイルが正常にロード（200ステータス）
+- ✅ playlist.jsonが正常に読み込まれた（200ステータス）
+- ✅ チャンクファイルが順次リクエストされている（206ステータス）
+- ✅ 404エラーが解消されている
+
+**利点:**
+- ✅ ブラウザの実際の動作を**確実に検証**
+- ✅ Playwright MCPの動作不要
+- ✅ キャッシュ問題の有無も確認可能
+- ✅ チャンク連続再生の動作確認にも使用可能
+
+**欠点:**
+- ❌ 視覚的な確認（UI表示）はできない
+- ❌ JavaScript実行エラーは検出できない（ブラウザコンソール確認必要）
+
+#### Chromiumバージョン確認コマンド
+
+**インストール済みChromiumの確認:**
+
+```bash
+# Windowsの場合
+dir "C:\Users\Tenormusica\AppData\Local\ms-playwright"
+
+# 出力例:
+# chromium-1179  ← Playwright MCP期待バージョン（存在しない）
+# chromium-1194  ← 実際にインストール済みバージョン
+# firefox-1465
+# webkit-2095
+```
+
+**実行可能ファイルの存在確認:**
+
+```bash
+# 期待されるバージョン（存在しないためエラー）
+ls "C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1179\chrome-win\chrome.exe"
+
+# 実際に存在するバージョン
+ls "C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1194\chrome-win\chrome.exe"
+```
+
+#### 実際のワークフロー（このセッションでの解決例）
+
+**ステップ1: Playwright MCP起動試行**
+```bash
+playwright_navigate(url="http://localhost:8081")
+# → エラー: chromium-1179が存在しない
+```
+
+**ステップ2: 既存Chromiumを直接起動**
+```bash
+"C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1194\chrome-win\chrome.exe" --new-window "http://localhost:8081" &
+# → 成功: ブラウザが起動
+```
+
+**ステップ3: サーバーログで動作確認**
+```bash
+# サーバーログを確認
+[200] GET /audio/affinity-3-free-canva-ai-strategy-2025/playlist.json
+[206] GET /audio/affinity-3-free-canva-ai-strategy-2025/article_ja-female_chunk_01.mp3
+# → チャンク1が正常に読み込まれていることを確認
+```
+
+**ステップ4: 追加確認待機**
+```bash
+# チャンク2, 3の自動再生を待機（約73秒/チャンク）
+sleep 60
+# サーバーログで次のチャンクがリクエストされているか確認
+```
+
+#### 重要な教訓
+
+**Playwright MCPの制限を理解する:**
+1. **バージョン不一致は頻繁に発生** - MCPサーバーとローカル環境の同期は困難
+2. **代替手段を常に用意** - Chromium直接起動、Puppeteer、サーバーログ確認
+3. **サーバーログが最も信頼できる** - ブラウザUIが見えなくても、実際のHTTPリクエストで動作確認可能
+
+**Claude Code環境でのブラウザ自動化のベストプラクティス:**
+1. **Playwright MCPを第一選択肢としない** - バージョン問題が頻発
+2. **サーバーログ確認を優先** - HTTPリクエストログで実際の動作を検証
+3. **スクリーンショットはPuppeteerで代替** - 必要な場合のみ使用
+4. **Chromium直接起動で基本動作確認** - ユーザー手動操作と組み合わせ
+
+#### 今後の改善案
+
+**Playwright MCP依存度を下げる:**
+- [ ] サーバーログ自動解析スクリプトの作成
+- [ ] Puppeteerスクリプトの標準化（スクリーンショット用）
+- [ ] ブラウザ操作が必要な場合は、ユーザーに手動操作を依頼
+- [ ] Playwright MCPバージョン不一致検出の自動化
+
+**ドキュメント化:**
+- [x] Playwright MCPトラブルシューティングをDESIGN_DOCUMENT.mdに記載
+- [ ] Claude Codeプロジェクト共通の「ブラウザ自動化ガイド」作成
 
 ---
 

@@ -54,34 +54,46 @@ def validate_article_content(markdown, article_path):
 
 def extract_text_from_markdown(markdown):
     """マークダウンから本文を抽出"""
-    # frontmatter除去
+    # 1. frontmatter除去（最優先）
     text = re.sub(r'^---\n[\s\S]*?\n---\n', '', markdown)
     
-    # 参照元セクション除去
-    text = re.sub(r'^##\s*参照元\n[\s\S]*?(?=\n##\s)', '', text, flags=re.MULTILINE)
+    # 2. 参照元セクション除去（ファイル末尾まで対応）
+    text = re.sub(r'^##\s*参照元\n[\s\S]*?(?=\n##\s|\Z)', '', text, flags=re.MULTILINE)
     
-    # 見出し記号除去
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-    
-    # リンク記法を文字列に変換
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-    
-    # 太字・斜体記号除去
-    text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', text)
-    text = re.sub(r'\*([^\*]+)\*', r'\1', text)
-    
-    # コードブロック除去
+    # 3. コードブロック除去（インライン処理前に実施）
     text = re.sub(r'```[\s\S]*?```', '', text)
     text = re.sub(r'`([^`]+)`', r'\1', text)
     
-    # URLのみの行を除去
-    text = re.sub(r'^https?://.*$', '', text, flags=re.MULTILINE)
+    # 4. 見出し記号除去（行頭の # のみ、空白なしも対応）
+    text = re.sub(r'^#{1,}\s*', '', text, flags=re.MULTILINE)
     
-    # 複数の空行を1つに
+    # 5. リンク記法を文字列に変換（URL除去前に実施）
+    text = re.sub(r'\[([^\]]+?)\]\([^\)]+?\)', r'\1', text)
+    
+    # 6. 強調記法除去（長いものから順に処理、最短マッチ使用）
+    text = re.sub(r'\*{3}(.+?)\*{3}', r'\1', text)  # ***強調***
+    text = re.sub(r'\*{2}(.+?)\*{2}', r'\1', text)  # **太字**
+    text = re.sub(r'\*(.+?)\*', r'\1', text)        # *斜体*
+    
+    # 7. 箇条書き記号除去（強調記法除去後に実施）
+    text = re.sub(r'^\s*\*+\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^[-•]\s+', '', text, flags=re.MULTILINE)
+    
+    # 8. 番号付きリスト記号除去
+    text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
+    
+    # 9. URL除去（すべてのURL、埋め込み含む）
+    text = re.sub(r'https?://[^\s]+', '', text)
+    
+    # 10. 引用記号除去
+    text = re.sub(r'^>+\s*', '', text, flags=re.MULTILINE)
+    
+    # 11. 記号全般を除去（読まなくていい記号）
+    # ドル記号、パーセント、アンパサンド、プラス、イコール、パイプ、バックスラッシュ、アンダースコア等
+    text = re.sub(r'[\$%&+=|\\]', '', text)
+    
+    # 12. 複数の空行を1つに統合（最終調整）
     text = re.sub(r'\n\n+', '\n\n', text)
-    
-    # 箇条書き記号除去
-    text = re.sub(r'^[-*]\s+', '', text, flags=re.MULTILINE)
     
     return text.strip()
 
