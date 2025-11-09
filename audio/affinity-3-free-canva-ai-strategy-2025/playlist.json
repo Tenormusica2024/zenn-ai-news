@@ -1,0 +1,13 @@
+{
+  "article": "affinity-3-free-canva-ai-strategy-2025.md",
+  "speaker": "ja-female",
+  "speakerName": "日本語（女性）",
+  "chunks": [
+    "article_ja-female_chunk_01.mp3",
+    "article_ja-female_chunk_02.mp3",
+    "article_ja-female_chunk_03.mp3"
+  ],
+  "totalChunks": 3,
+  "engine": "Google Cloud TTS",
+  "createdAt": "2025-11-09T03:49:47.336819"
+}

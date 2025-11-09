@@ -7,11 +7,21 @@ const { spawn } = require('child_process');
 
 // 利用可能な話者リスト
 const AVAILABLE_SPEAKERS = {
-  // gTTS（軽量・高速）
+  // Google Cloud TTS（プロフェッショナル）
+  'ja-male': { 
+    type: 'google-cloud-tts', 
+    name: '日本語（男性）', 
+    description: 'Google Cloud TTS 日本語男性音声' 
+  },
+  'ja-female': { 
+    type: 'google-cloud-tts', 
+    name: '日本語（女性）', 
+    description: 'Google Cloud TTS 日本語女性音声' 
+  },
   'ja-normal': { 
-    type: 'gtts', 
-    name: 'Google翻訳音声（標準）', 
-    description: '軽量・高速なGoogle TTS' 
+    type: 'google-cloud-tts', 
+    name: '日本語（標準）', 
+    description: 'Google Cloud TTS 日本語標準音声' 
   },
   // VOICEVOX（高品質だが重い）
   'zundamon': { 
@@ -35,9 +45,9 @@ async function generateAudio(articlePath, speakerKey) {
   
   console.log(`音声生成開始: ${speaker.name} (${speakerKey})`);
   
-  if (speaker.type === 'gtts') {
-    // gTTS (Python) を使用
-    await runPythonScript('gtts_article_to_speech.py', articlePath, speakerKey);
+  if (speaker.type === 'google-cloud-tts') {
+    // Google Cloud TTS (Python) を使用
+    await runPythonScript('generate_tts_audio.py', articlePath, speakerKey);
   } else if (speaker.type === 'voicevox') {
     // VOICEVOX (Node.js) を使用
     await runVoicevoxScript(articlePath, speakerKey);
@@ -64,7 +74,7 @@ function runPythonScript(scriptName, articlePath, speakerKey) {
     
     process.on('close', (code) => {
       if (code === 0) {
-        console.log('音声生成完了（gTTS）');
+        console.log('音声生成完了（Google Cloud TTS）');
         resolve();
       } else {
         reject(new Error(`Python script exited with code ${code}`));

@@ -1,0 +1,17 @@
+# Zenn Article Audio Reader - Python Dependencies
+# Google Cloud Text-to-Speech API（メイン音声エンジン）
+
+google-cloud-texttospeech>=2.16.0
+
+# 依存パッケージ（自動インストール）
+# - protobuf
+# - googleapis-common-protos
+# - grpcio
+# - google-auth
+# - google-api-core
+
+# インストール方法:
+# pip install -r requirements.txt
+
+# または個別インストール:
+# pip install google-cloud-texttospeech
