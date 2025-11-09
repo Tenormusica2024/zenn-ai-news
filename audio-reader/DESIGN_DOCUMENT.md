@@ -681,6 +681,63 @@ node server.js
 
 ## トラブルシューティング
 
+### 🚨 CRITICAL: 新規記事の音声生成必須手順
+
+**すべての新規記事について、以下の3種類の音声を必ず生成すること:**
+
+1. **ja-male（男性音声）** - デフォルト音声
+2. **ja-female（女性音声）** - 女性ナレーション
+3. **ja-normal（標準音声）** - バックアップ用
+
+**生成手順:**
+
+```bash
+cd C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader
+
+# 1. ja-male（男性音声）を生成
+node scripts/generate_article_audio.js ../articles/[記事ファイル名].md ja-male
+
+# 2. ja-female（女性音声）を生成
+node scripts/generate_article_audio.js ../articles/[記事ファイル名].md ja-female
+
+# 3. ja-normal（標準音声）を生成
+node scripts/generate_article_audio.js ../articles/[記事ファイル名].md ja-normal
+```
+
+**生成確認:**
+
+```bash
+# 生成された音声ファイルを確認
+ls audio/[記事スラッグ]/
+
+# 期待される出力:
+# article_ja-male_chunk_01.mp3
+# article_ja-male_chunk_02.mp3
+# article_ja-female_chunk_01.mp3
+# article_ja-female_chunk_02.mp3
+# article_ja-normal_chunk_01.mp3
+# article_ja-normal_chunk_02.mp3
+# playlist.json
+```
+
+**重要な注意事項:**
+
+- 🚨 **3種類すべての音声を生成しないと、ユーザーが音声切り替え時に404エラーになる**
+- `index.html`のデフォルト音声設定は`ja-male`なので、必ず最初に生成すること
+- 音声生成には1種類あたり約20-30秒かかる（記事の長さによる）
+- Google Cloud TTSの認証情報（`service-account-key.json`）が必要
+
+**典型的なエラー:**
+
+```
+Failed to load resource: the server responded with a status of 404 ()
+zenn-ai-news/audio-reader/audio/[記事]/article_ja-male_chunk_01.mp3
+```
+
+このエラーが出た場合、該当する音声ファイルが生成されていないことを意味する。
+
+---
+
 ### Q1. gTTS音声生成が失敗する
 
 **症状**:
