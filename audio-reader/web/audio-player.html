@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zenn記事音声朗読プレイヤー</title>
+  <title>Zenn Article Audio Reader</title>
   <style>
     * {
       margin: 0;
@@ -40,8 +40,22 @@
       text-align: center;
       position: relative;
       z-index: 1;
-      padding-bottom: 2rem;
+      padding: 3rem 2rem 2rem;
       border-bottom: 1px solid #333;
+      background: linear-gradient(135deg, rgba(15, 15, 15, 0.6) 0%, rgba(30, 30, 30, 0.6) 100%);
+      border-radius: 16px;
+    }
+    
+    .header-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
     }
     
     .header h1 {
@@ -56,9 +70,50 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
       font-size: 1.8rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
       font-weight: 700;
       letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+    }
+    
+    .header-title-icon {
+      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
+    }
+    
+    .header-meta {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      font-size: 0.9rem;
+      color: #999;
+    }
+    
+    .header-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .article-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    .article-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 1rem;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
     }
     
     .article-title {
@@ -71,9 +126,32 @@
       background-clip: text;
       font-size: 1.5rem;
       font-weight: 700;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
       letter-spacing: -0.01em;
       text-align: center;
+    }
+    
+    .article-date {
+      font-size: 0.85rem;
+      color: #999;
+      text-align: center;
+    }
+    
+    .article-url {
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+    
+    .article-url a {
+      color: #4a9eff;
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+    
+    .article-url a:hover {
+      color: #6bb5ff;
+      text-decoration: underline;
     }
     
     .container {
@@ -116,18 +194,25 @@
     }
     
     .thumbnail:hover {
-      border-color: rgba(255, 255, 255, 0.25);
-      box-shadow: 0 8px 24px rgba(74, 158, 255, 0.2);
+      border-color: rgba(201, 169, 97, 0.4);
+      box-shadow: 0 8px 24px rgba(201, 169, 97, 0.3);
     }
     
     .progress-container {
       background: rgba(255, 255, 255, 0.1);
-      height: 8px;
-      border-radius: 4px;
+      height: 10px;
+      border-radius: 5px;
       margin-bottom: 20px;
       cursor: pointer;
       position: relative;
       transition: background 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      user-select: none;
+    }
+    
+    .progress-container:focus {
+      outline: 2px solid rgba(201, 169, 97, 0.6);
+      outline-offset: 2px;
     }
     
     .progress-container:hover {
@@ -135,12 +220,27 @@
     }
     
     .progress-bar {
-      background: linear-gradient(90deg, #4a9eff 0%, #66b3ff 100%);
+      background: linear-gradient(90deg, #c9a961 0%, #d4af77 50%, #c9a961 100%);
       height: 100%;
-      border-radius: 4px;
+      border-radius: 5px;
       width: 0%;
-      transition: width 0.1s;
-      box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+      transition: width 0.1s linear;
+      box-shadow: 0 0 15px rgba(201, 169, 97, 0.6), 0 0 5px rgba(201, 169, 97, 0.3);
+      position: relative;
+    }
+    
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 12px;
+      background: #d4af77;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(201, 169, 97, 0.8);
+      border: 2px solid rgba(255, 255, 255, 0.3);
     }
     
     .time-display {
@@ -159,7 +259,7 @@
     }
     
     button {
-      background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(138, 43, 226, 0.2));
+      background: linear-gradient(135deg, rgba(58, 58, 74, 0.4), rgba(74, 74, 90, 0.4));
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.2);
       padding: 12px 24px;
@@ -172,10 +272,10 @@
     }
     
     button:hover {
-      background: linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(138, 43, 226, 0.3));
-      border-color: rgba(255, 255, 255, 0.3);
+      background: linear-gradient(135deg, rgba(58, 58, 74, 0.6), rgba(74, 74, 90, 0.6));
+      border-color: rgba(201, 169, 97, 0.4);
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+      box-shadow: 0 4px 12px rgba(201, 169, 97, 0.3);
     }
     
     button:active {
@@ -216,6 +316,60 @@
       color: #ccc;
       border: 1px solid transparent;
       background: rgba(30, 30, 30, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .article-item-date {
+      font-size: 0.75rem;
+      color: #666;
+      min-width: 80px;
+      flex-shrink: 0;
+    }
+    
+    .article-item-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .article-item-like {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+      font-size: 0.9rem;
+    }
+    
+    .article-item-like:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .article-item-like-icon {
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+    
+    .article-item-like:hover .article-item-like-icon {
+      transform: scale(1.2);
+    }
+    
+    .article-item-like.liked .article-item-like-icon {
+      color: #ff6b6b;
+    }
+    
+    .article-item-like-count {
+      font-size: 0.85rem;
+      color: #999;
+      min-width: 20px;
+      text-align: right;
     }
     
     .article-item:hover {
@@ -226,11 +380,11 @@
     }
     
     .article-item.active {
-      background: linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(138, 43, 226, 0.3));
+      background: linear-gradient(135deg, rgba(58, 58, 74, 0.6), rgba(74, 74, 90, 0.6));
       color: #ffffff;
       font-weight: 600;
-      border-color: rgba(74, 158, 255, 0.5);
-      box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+      border-color: rgba(201, 169, 97, 0.5);
+      box-shadow: 0 4px 12px rgba(201, 169, 97, 0.3);
     }
     
     .article-list-title {
@@ -245,6 +399,32 @@
       text-align: center;
       color: #999;
       padding: 20px;
+    }
+    
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      z-index: 10;
+    }
+    
+    .spinner {
+      color: #c9a961;
+      font-size: 16px;
+      font-weight: 600;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
     }
     
     .speed-control {
@@ -305,6 +485,72 @@
       background: rgba(30, 30, 30, 0.8);
     }
     
+    .volume-control {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .volume-control label {
+      font-size: 14px;
+      color: #999;
+    }
+    
+    .volume-control input[type="range"] {
+      width: 150px;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    
+    .volume-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #c9a961 0%, #d4af77 100%);
+      cursor: pointer;
+      border: 2px solid rgba(201, 169, 97, 0.4);
+      transition: all 0.3s ease;
+    }
+    
+    .volume-control input[type="range"]::-webkit-slider-thumb:hover {
+      background: linear-gradient(135deg, #d4af77 0%, #e0bf8d 100%);
+      border-color: rgba(201, 169, 97, 0.7);
+      transform: scale(1.1);
+      box-shadow: 0 0 10px rgba(201, 169, 97, 0.5);
+    }
+    
+    .volume-control input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #c9a961 0%, #d4af77 100%);
+      cursor: pointer;
+      border: 2px solid rgba(201, 169, 97, 0.4);
+      transition: all 0.3s ease;
+    }
+    
+    .volume-control input[type="range"]::-moz-range-thumb:hover {
+      background: linear-gradient(135deg, #d4af77 0%, #e0bf8d 100%);
+      border-color: rgba(201, 169, 97, 0.7);
+      transform: scale(1.1);
+      box-shadow: 0 0 10px rgba(201, 169, 97, 0.5);
+    }
+    
+    .volume-value {
+      font-size: 14px;
+      color: #ccc;
+      min-width: 35px;
+      text-align: right;
+    }
+    
     @media (max-width: 768px) {
       body {
         padding: 1rem 0.5rem;
@@ -331,15 +577,50 @@
 </head>
 <body>
   <div class="header">
-    <h1>🎙️ Zenn記事音声朗読</h1>
+    <h1>
+      <svg class="header-title-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#4a9eff;stop-opacity:1" />
+            <stop offset="50%" style="stop-color:#6bb5ff;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#8ac5ff;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <!-- 音声波形アイコン -->
+        <path d="M12 3v18M8 6v12M16 6v12M4 9v6M20 9v6" 
+              stroke="url(#iconGradient)" 
+              stroke-width="2.5" 
+              stroke-linecap="round"/>
+        <!-- 再生ボタン中央 -->
+        <circle cx="12" cy="12" r="4" fill="url(#iconGradient)" opacity="0.3"/>
+        <path d="M11 10l3 2-3 2V10z" fill="url(#iconGradient)"/>
+      </svg>
+      Zenn Article Audio Reader
+    </h1>
   </div>
   
   <div class="container">
-    <div class="player">
-      <p class="article-title" id="articleTitle">読み込み中...</p>
-      <img src="affinity-thumbnail.jpg" alt="Article Thumbnail" class="thumbnail">
+    <div class="player" style="position: relative;">
+      <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="spinner">Loading...</div>
+      </div>
       
-      <div class="progress-container" id="progressContainer">
+      <div class="article-header">
+        <p class="article-title" id="articleTitle">読み込み中...</p>
+        <p class="article-date" id="articleDate">📅 公開日を読み込み中...</p>
+        <p class="article-url"><a id="articleLink" href="#" target="_blank" rel="noopener noreferrer">🔗 Zennで記事を読む</a></p>
+      </div>
+      
+      <img src="/web/affinity-thumbnail.jpg" alt="Article Thumbnail" class="thumbnail">
+      
+      <div class="progress-container" 
+           id="progressContainer" 
+           role="slider" 
+           aria-label="Audio playback progress" 
+           aria-valuemin="0" 
+           aria-valuemax="100" 
+           aria-valuenow="0" 
+           tabindex="0">
         <div class="progress-bar" id="progressBar"></div>
       </div>
       
@@ -348,38 +629,45 @@
         <span id="totalTime">0:00</span>
       </div>
       
-      <div class="chunk-info" id="chunkInfo">チャンク 0 / 0</div>
+      <div class="chunk-info" id="chunkInfo">Article 0 / 0</div>
       
       <div class="controls">
-        <button id="prevBtn" disabled>⏮️ 前へ</button>
-        <button id="playBtn">▶️ 再生</button>
-        <button id="nextBtn" disabled>次へ ⏭️</button>
+        <button id="prevBtn" disabled>Previous</button>
+        <button id="playBtn">Play</button>
+        <button id="nextBtn" disabled>Next</button>
       </div>
       
       <div class="speed-control">
-        <label for="speedSelect">再生速度:</label>
+        <label for="speedSelect">Playback Speed:</label>
         <select id="speedSelect">
-          <option value="0.5">0.5x</option>
-          <option value="0.75">0.75x</option>
-          <option value="1" selected>1.0x</option>
-          <option value="1.25">1.25x</option>
+          <option value="1.0">1.0x</option>
+          <option value="1.2">1.2x</option>
+          <option value="1.3">1.3x</option>
+          <option value="1.4" selected>1.4x</option>
           <option value="1.5">1.5x</option>
-          <option value="2">2.0x</option>
+          <option value="1.6">1.6x</option>
+          <option value="2.0">2.0x</option>
         </select>
       </div>
       
       <div class="voice-control">
-        <label for="voiceSelect">ナレーター:</label>
+        <label for="voiceSelect">Voice:</label>
         <select id="voiceSelect">
-          <option value="ja-normal" selected>Google翻訳音声（標準）</option>
-          <option value="zundamon">VOICEVOX ずんだもん</option>
+          <option value="ja-male" selected>Japanese Male (Google Cloud TTS)</option>
+          <option value="ja-female">Japanese Female (Google Cloud TTS)</option>
         </select>
+      </div>
+      
+      <div class="volume-control">
+        <label for="volumeSlider">Volume:</label>
+        <input type="range" id="volumeSlider" min="0" max="100" value="50">
+        <span class="volume-value" id="volumeValue">50%</span>
       </div>
     </div>
     
     <div class="article-list" id="articleList">
-      <div class="article-list-title">📚 記事一覧</div>
-      <div class="loading">読み込み中...</div>
+      <div class="article-list-title">Article List</div>
+      <div class="loading">Loading...</div>
     </div>
   </div>
   
@@ -397,24 +685,37 @@
     const chunkInfo = document.getElementById('chunkInfo');
     const articleList = document.getElementById('articleList');
     const articleTitle = document.getElementById('articleTitle');
+    const articleDate = document.getElementById('articleDate');
     const speedSelect = document.getElementById('speedSelect');
     const voiceSelect = document.getElementById('voiceSelect');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const volumeValue = document.getElementById('volumeValue');
+    const loadingOverlay = document.getElementById('loadingOverlay');
     
     let articles = [];
     let currentArticleIndex = 0;
-    let currentVoice = 'ja-normal';
+    let currentVoice = 'ja-male';
+    let isDragging = false;
+    let dragStarted = false;
+    let isLoading = false;
     
     // 利用可能な記事リスト
     const availableArticles = [
       {
         slug: 'affinity-3-free-canva-ai-strategy-2025',
         title: 'Affinity無料化でCanvaのAI戦略が明らかに',
-        thumbnail: 'affinity-thumbnail.jpg'
+        thumbnail: '/web/affinity-thumbnail.jpg',
+        publishDate: '2025/11/06',
+        url: 'https://zenn.dev/dragonrondo/articles/affinity-3-free-canva-ai-strategy-2025',
+        likes: 0
       },
       {
         slug: 'ai-agents-70-percent-failure-reality-2025',
         title: 'AIエージェントの70%が失敗する現実',
-        thumbnail: 'affinity-thumbnail.jpg'
+        thumbnail: '/web/ai-agents-thumbnail.jpg',
+        publishDate: '2025/11/07',
+        url: 'https://zenn.dev/dragonrondo/articles/ai-agents-70-percent-failure-reality-2025',
+        likes: 0
       }
     ];
     
@@ -425,23 +726,43 @@
         renderArticleList();
         loadArticle(0);
       } catch (error) {
-        articleList.innerHTML = '<div class="loading">エラー: 記事を読み込めませんでした</div>';
+        articleList.innerHTML = '<div class="loading">Error: Failed to load articles</div>';
         console.error('Articles load error:', error);
       }
     }
     
     // 記事情報更新
     function updateArticleInfo() {
-      chunkInfo.textContent = `記事 ${currentArticleIndex + 1} / ${articles.length}`;
+      chunkInfo.textContent = `Article ${currentArticleIndex + 1} / ${articles.length}`;
+    }
+    
+    // いいね件数を取得
+    function getLikeCount(slug) {
+      const count = localStorage.getItem(`article_${slug}_count`);
+      return count ? parseInt(count) : 0;
+    }
+    
+    // いいね件数を設定
+    function setLikeCount(slug, count) {
+      localStorage.setItem(`article_${slug}_count`, count.toString());
     }
     
     // 記事リスト表示
     function renderArticleList() {
-      const listHTML = '<div class="article-list-title">📚 記事一覧</div>' +
+      const listHTML = '<div class="article-list-title">Article List</div>' +
         articles.map((article, index) => {
+          const liked = localStorage.getItem(`article_${article.slug}_liked`) === 'true';
+          const likeCount = getLikeCount(article.slug);
           return `<div class="article-item ${index === currentArticleIndex ? 'active' : ''}" 
                        data-index="${index}">
-                    ${article.title}
+                    <span class="article-item-date">${article.publishDate}</span>
+                    <span class="article-item-title">${article.title}</span>
+                    <span class="article-item-like ${liked ? 'liked' : ''}" 
+                          data-slug="${article.slug}"
+                          onclick="event.stopPropagation(); toggleLike('${article.slug}')">
+                      <span class="article-item-like-icon">${liked ? '♥' : '♡'}</span>
+                      <span class="article-item-like-count">${likeCount}</span>
+                    </span>
                   </div>`;
         }).join('');
       
@@ -449,17 +770,53 @@
       
       // クリックイベント
       document.querySelectorAll('.article-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const index = parseInt(item.dataset.index);
-          loadArticle(index);
-          audio.play();
+        item.addEventListener('click', (e) => {
+          if (!e.target.closest('.article-item-like')) {
+            const index = parseInt(item.dataset.index);
+            loadArticle(index);
+          }
         });
       });
     }
     
+    // いいね切り替え
+    function toggleLike(slug) {
+      const currentState = localStorage.getItem(`article_${slug}_liked`) === 'true';
+      const currentCount = getLikeCount(slug);
+      
+      if (currentState) {
+        // いいね解除
+        localStorage.setItem(`article_${slug}_liked`, 'false');
+        setLikeCount(slug, Math.max(0, currentCount - 1));
+      } else {
+        // いいね追加
+        localStorage.setItem(`article_${slug}_liked`, 'true');
+        setLikeCount(slug, currentCount + 1);
+      }
+      
+      renderArticleList();
+    }
+    
+    // ローディング表示制御
+    function showLoading() {
+      isLoading = true;
+      loadingOverlay.style.display = 'flex';
+    }
+    
+    function hideLoading() {
+      isLoading = false;
+      loadingOverlay.style.display = 'none';
+    }
+    
+    // チャンク再生用の変数
+    let currentChunks = [];
+    let currentChunkIndex = 0;
+    
     // 記事読み込み
-    function loadArticle(index) {
+    async function loadArticle(index) {
       if (index < 0 || index >= articles.length) return;
+      
+      showLoading();
       
       currentArticleIndex = index;
       const article = articles[index];
@@ -469,14 +826,85 @@
       articleTitle.textContent = article.title;
       document.querySelector('.thumbnail').src = article.thumbnail;
       
-      // gTTSはMP3、VOICEVOXはWAV
-      const extension = currentVoice === 'ja-normal' ? 'mp3' : 'wav';
-      const filename = `article_${currentVoice}.${extension}`;
-      audio.src = audioBasePath + filename;
+      // 公開日更新
+      articleDate.textContent = `📅 ${article.publishDate}に公開`;
+      
+      // 記事URLリンク更新
+      const articleLink = document.getElementById('articleLink');
+      articleLink.href = article.url;
+      
+      // playlist.json読み込み
+      try {
+        const response = await fetch(audioBasePath + 'playlist.json');
+        const playlist = await response.json();
+        
+        // 選択された話者に対応するチャンクを取得
+        let voiceId;
+        if (currentVoice === 'ja-male') {
+          voiceId = 'ja-male';
+        } else if (currentVoice === 'ja-female') {
+          voiceId = 'ja-female';
+        } else if (currentVoice === 'zundamon') {
+          voiceId = 'zundamon';
+        } else {
+          voiceId = 'ja-normal';  // デフォルト
+        }
+        
+        // 選択された話者のチャンクファイルを直接構築
+        const chunkCount = playlist.totalChunks || 3;
+        const chunks = [];
+        for (let i = 1; i <= chunkCount; i++) {
+          const chunkNum = i.toString().padStart(2, '0');
+          chunks.push(`article_${voiceId}_chunk_${chunkNum}.mp3`);
+        }
+        
+        currentChunks = chunks.map(chunk => audioBasePath + chunk);
+        currentChunkIndex = 0;
+        audio.src = currentChunks[0];
+        console.log(`Loading chunks for ${voiceId}:`, currentChunks);
+        
+        // フォールバック処理は削除（常にチャンク形式を使用）
+        if (false) {
+          // playlist.jsonに該当話者がない場合、単一ファイルを試行
+          let filename;
+          if (currentVoice === 'ja-male') {
+            filename = 'article_ja-male.mp3';
+          } else if (currentVoice === 'ja-female') {
+            filename = 'article_ja-female.mp3';
+          } else if (currentVoice === 'zundamon') {
+            filename = 'article_zundamon.wav';
+          } else {
+            filename = 'article_ja-normal.mp3';
+          }
+          currentChunks = [audioBasePath + filename];
+          currentChunkIndex = 0;
+          audio.src = currentChunks[0];
+        }
+      } catch (error) {
+        console.error('Failed to load playlist.json:', error);
+        // フォールバック: 単一ファイルを試行
+        let filename;
+        if (currentVoice === 'ja-male') {
+          filename = 'article_ja-male.mp3';
+        } else if (currentVoice === 'ja-female') {
+          filename = 'article_ja-female.mp3';
+        } else if (currentVoice === 'zundamon') {
+          filename = 'article_zundamon.wav';
+        } else {
+          filename = 'article_ja-normal.mp3';
+        }
+        currentChunks = [audioBasePath + filename];
+        currentChunkIndex = 0;
+        audio.src = currentChunks[0];
+      }
       
       updateArticleInfo();
       updateButtons();
       renderArticleList();
+      
+      // 再生ボタンを「Play」にリセット
+      playBtn.textContent = 'Play';
+      audio.pause();
     }
     
     // ボタン状態更新
@@ -505,7 +933,6 @@
     prevBtn.addEventListener('click', () => {
       if (currentArticleIndex > 0) {
         loadArticle(currentArticleIndex - 1);
-        audio.play();
       }
     });
     
@@ -513,45 +940,193 @@
     nextBtn.addEventListener('click', () => {
       if (currentArticleIndex < articles.length - 1) {
         loadArticle(currentArticleIndex + 1);
-        audio.play();
       }
     });
     
     // 再生状態更新
     audio.addEventListener('play', () => {
-      playBtn.textContent = '⏸️ 一時停止';
+      playBtn.textContent = 'Pause';
     });
     
     audio.addEventListener('pause', () => {
-      playBtn.textContent = '▶️ 再生';
+      playBtn.textContent = 'Play';
     });
     
     // 進捗更新
     audio.addEventListener('timeupdate', () => {
-      const progress = (audio.currentTime / audio.duration) * 100;
-      progressBar.style.width = `${progress}%`;
       currentTimeDisplay.textContent = formatTime(audio.currentTime);
+      
+      // durationが有効な場合のみプログレスバー更新
+      if (!isNaN(audio.duration) && audio.duration > 0 && isFinite(audio.duration)) {
+        const progress = (audio.currentTime / audio.duration) * 100;
+        progressBar.style.width = `${progress}%`;
+        progressContainer.setAttribute('aria-valuenow', Math.round(progress));
+      }
     });
     
     // 総時間表示
     audio.addEventListener('loadedmetadata', () => {
-      totalTimeDisplay.textContent = formatTime(audio.duration);
+      if (isFinite(audio.duration)) {
+        totalTimeDisplay.textContent = formatTime(audio.duration);
+      } else {
+        // durationが取得できない場合は"--:--"表示
+        totalTimeDisplay.textContent = '--:--';
+      }
+      hideLoading();
     });
     
-    // 記事終了時に次へ自動移行
+    // 音声ロード開始
+    audio.addEventListener('loadstart', () => {
+      showLoading();
+    });
+    
+    // 音声ロードエラー
+    audio.addEventListener('error', () => {
+      hideLoading();
+      console.error('Audio load error:', audio.error);
+    });
+    
+    // チャンク終了時の処理（連続再生）
     audio.addEventListener('ended', () => {
-      if (currentArticleIndex < articles.length - 1) {
-        loadArticle(currentArticleIndex + 1);
+      // 次のチャンクがあれば再生
+      if (currentChunkIndex < currentChunks.length - 1) {
+        currentChunkIndex++;
+        audio.src = currentChunks[currentChunkIndex];
         audio.play();
+      } else {
+        // すべてのチャンク再生完了、次の記事へ
+        if (currentArticleIndex < articles.length - 1) {
+          loadArticle(currentArticleIndex + 1);
+          audio.play();
+        }
       }
     });
     
-    // プログレスバークリックでシーク
-    progressContainer.addEventListener('click', (e) => {
+    // プログレスバークリック・ドラッグでシーク
+    const seekToPosition = (e) => {
+      // durationが有効な場合のみシーク実行
+      if (!audio.duration || isNaN(audio.duration) || audio.duration <= 0 || !isFinite(audio.duration)) {
+        return;
+      }
+      
+      performSeek(e);
+    };
+    
+    const performSeek = (e) => {
+      // durationが無効な場合はシーク無効化
+      if (!audio.duration || isNaN(audio.duration) || audio.duration <= 0 || !isFinite(audio.duration)) {
+        return;
+      }
+      
       const rect = progressContainer.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
+      
+      // タッチイベントとマウスイベントの両方に対応
+      let clientX;
+      if (e.type && e.type.startsWith('touch')) {
+        // タッチイベントの場合
+        if (e.touches && e.touches.length > 0) {
+          clientX = e.touches[0].clientX;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+          clientX = e.changedTouches[0].clientX;
+        } else {
+          return; // タッチ情報がない場合は処理しない
+        }
+      } else {
+        // マウスイベントの場合
+        clientX = e.clientX;
+      }
+      
+      if (clientX === undefined) return;
+      
+      const clickX = Math.max(0, Math.min(rect.width, clientX - rect.left));
       const percentage = clickX / rect.width;
-      audio.currentTime = audio.duration * percentage;
+      const newTime = audio.duration * percentage;
+      
+      if (isFinite(newTime) && newTime >= 0 && newTime <= audio.duration) {
+        const wasPlaying = !audio.paused;
+        audio.currentTime = newTime;
+        
+        // 元々再生中だった場合は再生を継続
+        if (wasPlaying && audio.paused) {
+          audio.play();
+        }
+      }
+    };
+    
+    // マウスドラッグ開始
+    progressContainer.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      dragStarted = false;
+    });
+    
+    // マウス移動
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        dragStarted = true;
+        seekToPosition(e);
+      }
+    });
+    
+    // マウスドラッグ終了
+    document.addEventListener('mouseup', (e) => {
+      if (isDragging) {
+        if (!dragStarted) {
+          seekToPosition(e);
+        }
+        isDragging = false;
+        dragStarted = false;
+      }
+    });
+    
+    // タッチ操作対応
+    progressContainer.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      isDragging = true;
+      dragStarted = false;
+    }, { passive: false });
+    
+    progressContainer.addEventListener('touchmove', (e) => {
+      if (isDragging) {
+        e.preventDefault();
+        dragStarted = true;
+        seekToPosition(e);
+      }
+    }, { passive: false });
+    
+    progressContainer.addEventListener('touchend', (e) => {
+      if (isDragging) {
+        if (!dragStarted) {
+          seekToPosition(e);
+        }
+        isDragging = false;
+        dragStarted = false;
+      }
+    });
+    
+    // キーボード操作対応
+    progressContainer.addEventListener('keydown', (e) => {
+      if (!audio.duration || !isFinite(audio.duration)) return;
+      
+      const step = 5; // 5秒単位で移動
+      
+      switch(e.key) {
+        case 'ArrowLeft':
+          audio.currentTime = Math.max(0, audio.currentTime - step);
+          e.preventDefault();
+          break;
+        case 'ArrowRight':
+          audio.currentTime = Math.min(audio.duration, audio.currentTime + step);
+          e.preventDefault();
+          break;
+        case 'Home':
+          audio.currentTime = 0;
+          e.preventDefault();
+          break;
+        case 'End':
+          audio.currentTime = audio.duration;
+          e.preventDefault();
+          break;
+      }
     });
     
     // 再生速度変更
@@ -574,6 +1149,19 @@
         }
       }, { once: true });
     });
+    
+    // 音量調整
+    volumeSlider.addEventListener('input', () => {
+      const volume = volumeSlider.value / 100;
+      audio.volume = volume;
+      volumeValue.textContent = `${volumeSlider.value}%`;
+    });
+    
+    // 初期音量設定
+    audio.volume = 0.5;
+    
+    // 初期再生速度設定
+    audio.playbackRate = 1.4;
     
     // 初期化
     loadArticles();
