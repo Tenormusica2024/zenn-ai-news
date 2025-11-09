@@ -611,7 +611,7 @@
         <p class="article-url"><a id="articleLink" href="#" target="_blank" rel="noopener noreferrer">🔗 Zennで記事を読む</a></p>
       </div>
       
-      <img src="/web/affinity-thumbnail.jpg" alt="Article Thumbnail" class="thumbnail">
+      <img src="audio-reader/web/affinity-thumbnail.jpg" alt="Article Thumbnail" class="thumbnail">
       
       <div class="progress-container" 
            id="progressContainer" 
@@ -704,7 +704,7 @@
       {
         slug: 'affinity-3-free-canva-ai-strategy-2025',
         title: 'Affinity無料化でCanvaのAI戦略が明らかに',
-        thumbnail: '/web/affinity-thumbnail.jpg',
+        thumbnail: 'audio-reader/web/affinity-thumbnail.jpg',
         publishDate: '2025/11/06',
         url: 'https://zenn.dev/dragonrondo/articles/affinity-3-free-canva-ai-strategy-2025',
         likes: 0
@@ -712,7 +712,7 @@
       {
         slug: 'ai-agents-70-percent-failure-reality-2025',
         title: 'AIエージェントの70%が失敗する現実',
-        thumbnail: '/web/ai-agents-thumbnail.jpg',
+        thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
         publishDate: '2025/11/07',
         url: 'https://zenn.dev/dragonrondo/articles/ai-agents-70-percent-failure-reality-2025',
         likes: 0
@@ -820,7 +820,7 @@
       
       currentArticleIndex = index;
       const article = articles[index];
-      const audioBasePath = `/audio/${article.slug}/`;
+      const audioBasePath = `audio-reader/audio/${article.slug}/`;
       
       // タイトルとサムネイル更新
       articleTitle.textContent = article.title;
