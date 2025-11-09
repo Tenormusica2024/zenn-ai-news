@@ -176,7 +176,9 @@ git clone [リポジトリURL]
 cd zenn-ai-news/audio-reader
 ```
 
-### 2. Python仮想環境構築（gTTS用）
+### 2. Python仮想環境構築とGoogle Cloud TTS設定
+
+#### 2-1. Python仮想環境構築
 
 ```bash
 # 仮想環境作成
@@ -188,9 +190,40 @@ venv_kokoro\Scripts\activate
 # 仮想環境有効化（Mac/Linux）
 source venv_kokoro/bin/activate
 
-# パッケージインストール
-pip install gTTS
+# パッケージインストール（Google Cloud TTS - 推奨）
+pip install google-cloud-texttospeech
+
+# または gTTS（軽量・無料の代替手段）
+# pip install gTTS
 ```
+
+#### 2-2. Google Cloud TTS認証設定（推奨）
+
+Google Cloud TTSを使用する場合は、サービスアカウントキーが必要です。
+
+**手順:**
+
+1. **Google Cloud Consoleでサービスアカウントキーを取得**
+   - https://console.cloud.google.com/ にアクセス
+   - プロジェクトを選択（または新規作成）
+   - 「APIとサービス」→「認証情報」→「サービスアカウントキーを作成」
+   - JSON形式でダウンロード
+
+2. **キーファイルを配置**
+   ```bash
+   # audio-readerディレクトリに配置
+   # ファイル名: service-account-key.json
+   cp /path/to/downloaded-key.json C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json
+   ```
+
+3. **環境変数設定（自動設定済み）**
+   - `generate_tts_audio.py`が自動的に`service-account-key.json`を読み込みます
+   - 手動設定する場合: `set GOOGLE_APPLICATION_CREDENTIALS=C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json`
+
+**注意事項:**
+- ✅ **Google Cloud TTS**: 高品質Neural2音声、有料（無料枠: 400万文字/月）、推奨
+- ⚠️ **gTTS**: Google翻訳API使用、無料・無制限だが音声品質は標準的、認証不要
+- gTTSは認証設定が不要なため、service-account-key.jsonがない場合の代替手段として使用可能
 
 ### 3. VOICEVOX導入（オプション）
 
