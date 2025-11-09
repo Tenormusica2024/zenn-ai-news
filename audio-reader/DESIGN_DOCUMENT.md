@@ -216,14 +216,28 @@ Google Cloud TTSを使用する場合は、サービスアカウントキーが�
    cp /path/to/downloaded-key.json C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json
    ```
 
-   **🔍 既存ファイルの利用（実際のセットアップ例）:**
-   - 同じGCPプロジェクト（yt-transcript-demo-2025）を使用している場合、既存のservice-account-key.jsonを流用可能
-   - 例: AI FM Podcastプロジェクトのservice-account-keyを使用
+   **🔍 既存ファイルの利用:**
+   
+   ⚠️ **セキュリティ警告**: 
+   - 異なるプロジェクト間でのサービスアカウントキー共有は**セキュリティのベストプラクティスに反します**
+   - 各プロジェクト専用のサービスアカウントを作成し、最小権限の原則に従うことを強く推奨
+   - 以下は緊急対応時のワークアラウンドであり、**推奨される方法ではありません**
+   
+   **緊急時の暫定対応（非推奨）:**
+   - 同じGCPプロジェクトの既存service-account-key.jsonを一時的に流用可能
      ```bash
-     # ホームディレクトリにあるservice-account-key.jsonをコピー
-     cp "C:\Users\Tenormusica\UsersTenormusicaAI_FM_PODCAST_YOUTUBE_AUDIO_IMPLEMENTATION_20250930service-account-key.json" "C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json"
+     # ホームディレクトリで既存のキーファイルを検索
+     ls -la ~/ | grep service-account-key
+     
+     # 見つかった場合は一時的にコピー（本番環境では使用禁止）
+     cp "~/[既存のservice-account-keyファイル]" "audio-reader/service-account-key.json"
      ```
-   - **動作確認済み**: 同じGCPプロジェクトのサービスアカウントであれば、異なるプロジェクトフォルダ間で共有可能
+   
+   **🔒 推奨される正しい手順:**
+   1. GCP Consoleで新規サービスアカウント作成
+   2. 必要最小限の権限のみ付与（`roles/cloudtexttospeech.user`）
+   3. 新規キーを生成して`audio-reader/service-account-key.json`に配置
+   4. 古いキーは即座に無効化
 
 3. **環境変数設定（自動設定済み）**
    - `generate_tts_audio.py`が自動的に`service-account-key.json`を読み込みます
@@ -1743,19 +1757,26 @@ google.api_core.exceptions.PermissionDenied: 403 Caller does not have required p
 
 2. ファイルが存在しない場合:
    
-   **方法A: 既存ファイルを流用（推奨・最速）**
-   - 同じGCPプロジェクト（yt-transcript-demo-2025）の他のservice-account-key.jsonを探す
+   **方法A（推奨）: 新規サービスアカウント作成**
+   1. GCP Console: https://console.cloud.google.com/iam-admin/serviceaccounts?project=yt-transcript-demo-2025
+   2. 「サービスアカウントを作成」をクリック
+   3. 名前: `zenn-audio-reader` / 説明: `Zenn記事音声生成専用`
+   4. 権限付与: `Cloud Text-to-Speech API ユーザー` のみ
+   5. キーを作成 → JSON形式でダウンロード
+   6. `audio-reader/service-account-key.json`に配置
+   
+   **方法B（緊急時のみ）: 既存ファイル流用**
+   
+   ⚠️ **セキュリティリスク**: この方法は最小権限の原則に反します
    ```bash
    # ホームディレクトリで検索
-   ls -la ~/ | grep service
+   ls -la ~/ | grep service-account-key
    
-   # 見つかった場合はコピー
-   cp "~/UsersTenormusicaAI_FM_PODCAST_YOUTUBE_AUDIO_IMPLEMENTATION_20250930service-account-key.json" audio-reader/service-account-key.json
+   # 見つかった場合は一時的にコピー（本番環境では使用禁止）
+   cp "~/[既存ファイル]" audio-reader/service-account-key.json
    ```
    
-   **方法B: 新規ダウンロード**
-   - Google Cloud Consoleからサービスアカウントキーをダウンロード
-   - `audio-reader/service-account-key.json`に配置
+   🔒 **重要**: 方法Bを使用した場合、速やかに方法Aで専用アカウントを作成し、古いキーは無効化すること
 
 3. 権限確認:
    ```bash
