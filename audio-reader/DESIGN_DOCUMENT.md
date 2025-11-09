@@ -2,15 +2,556 @@
 
 ## 📋 目次
 
-1. [システム概要](#システム概要)
-2. [アーキテクチャ](#アーキテクチャ)
-3. [技術スタック](#技術スタック)
-4. [環境構築手順](#環境構築手順)
-5. [ディレクトリ構造](#ディレクトリ構造)
-6. [音声エンジン仕様](#音声エンジン仕様)
-7. [実装詳細](#実装詳細)
-8. [API仕様](#api仕様)
-9. [トラブルシューティング](#トラブルシューティング)
+### 🔴 最重要（必読）
+1. [🚀 新規記事追加の完全ワークフロー](#新規記事追加の完全ワークフロー)
+
+### 🟡 重要（推奨）
+2. [システム概要](#システム概要)
+3. [アーキテクチャ](#アーキテクチャ)
+4. [技術スタック](#技術スタック)
+5. [環境構築手順](#環境構築手順)
+
+### 🟢 参考（必要時のみ）
+6. [ディレクトリ構造](#ディレクトリ構造)
+7. [音声エンジン仕様](#音声エンジン仕様)
+8. [実装詳細](#実装詳細)
+9. [API仕様](#api仕様)
+10. [トラブルシューティング](#トラブルシューティング)
+
+---
+
+## 🚀 新規記事追加の完全ワークフロー
+
+**このセクションは設計書の中で最も重要です。新規記事を追加する際は必ずこの手順に従ってください。**
+
+### 📝 概要
+
+記事作成から音声生成、サムネイル設定、GitHub Pagesデプロイまでの全工程を100%確実に実行するためのチェックリスト形式のワークフローです。
+
+### ✅ チェックリスト形式の実行手順
+
+#### STEP 1: 記事ファイルの準備
+
+```bash
+# 作業ディレクトリに移動
+cd "C:\Users\Tenormusica\Documents\zenn-ai-news"
+
+# 変数設定（記事スラッグを設定）
+$ARTICLE_SLUG = "github-agent-hq-unified-ai-coding-2025"  # ← 実際の記事スラッグに変更
+
+# 記事ファイルが存在することを確認
+Test-Path "articles\$ARTICLE_SLUG.md"  # True が返ることを確認
+
+# 記事内容が正しいことを確認（10行以上あること）
+(Get-Content "articles\$ARTICLE_SLUG.md").Count
+```
+
+**確認項目:**
+- [ ] 記事ファイルが `articles/` ディレクトリに存在する
+- [ ] 記事ファイルの行数が10行以上ある（404エラーでないこと）
+- [ ] frontmatter（---で囲まれた部分）が正しく記載されている
+
+---
+
+#### STEP 2: 音声ファイル生成（3種類必須）
+
+```bash
+# audio-readerディレクトリに移動
+cd audio-reader
+
+# 2-1. ja-male（男性音声・デフォルト）を生成
+node scripts/generate_article_audio.js "../articles/$ARTICLE_SLUG.md" ja-male
+
+# 2-2. ja-female（女性音声）を生成
+node scripts/generate_article_audio.js "../articles/$ARTICLE_SLUG.md" ja-female
+
+# 2-3. ja-normal（標準音声・バックアップ）を生成
+node scripts/generate_article_audio.js "../articles/$ARTICLE_SLUG.md" ja-normal
+
+# 生成確認（6ファイル存在することを確認）
+Get-ChildItem "audio\$ARTICLE_SLUG\"
+# 期待される出力:
+# - article_ja-male_chunk_01.mp3
+# - article_ja-male_chunk_02.mp3
+# - article_ja-female_chunk_01.mp3
+# - article_ja-female_chunk_02.mp3
+# - article_ja-normal_chunk_01.mp3
+# - article_ja-normal_chunk_02.mp3
+# - playlist.json
+```
+
+**確認項目:**
+- [ ] ja-male音声ファイルが生成された（chunk_01.mp3, chunk_02.mp3等）
+- [ ] ja-female音声ファイルが生成された
+- [ ] ja-normal音声ファイルが生成された
+- [ ] playlist.jsonが正しく生成された
+
+**🚨 重要:** 3種類すべての音声を生成しないと、ユーザーが音声切り替え時に404エラーになります。
+
+**生成時間の目安:**
+- ja-male: 約30秒
+- ja-female: 約20-30秒
+- ja-normal: 約20-30秒
+- **合計: 約1-1.5分**
+
+---
+
+#### STEP 3: サムネイル画像設定
+
+```bash
+# 3-1. Web検索で記事関連画像を探す（WebSearch使用）
+# 例: "GitHub Agent HQ unified AI coding environment 2025"
+# → 公式ブログ・プロダクトページを優先
+
+# 3-2. 画像URLを取得（WebFetch使用）
+# 公式記事のHTMLからヒーロー画像・OGP画像のURLを抽出
+
+# 3-3. 画像をダウンロード
+cd web
+curl -o "$ARTICLE_SLUG-thumbnail.jpg" "https://example.com/image.jpg"  # ← 実際の画像URLに変更
+
+# 3-4. サムネイル存在確認
+Test-Path "$ARTICLE_SLUG-thumbnail.jpg"  # True が返ることを確認
+```
+
+**サムネイル画像の推奨仕様:**
+- **サイズ:** 1200x630px（OGP標準サイズ）
+- **形式:** JPEG
+- **最大ファイルサイズ:** 500KB以下
+- **ソース:** 公式ブログ・プロダクトページから引用（著作権問題を回避）
+
+**確認項目:**
+- [ ] 記事内容に関連するサムネイル画像を取得した
+- [ ] 画像が `audio-reader/web/[記事スラッグ]-thumbnail.jpg` に保存された
+- [ ] 汎用的な `ai-agents-thumbnail.jpg` を使い回していない
+
+**🚨 重要:** 汎用的な `ai-agents-thumbnail.jpg` の使い回しは禁止です。記事ごとに専用のサムネイルを設定してください。
+
+---
+
+#### STEP 4: index.html 更新（GitHub Pages公開用）
+
+```bash
+# ルートディレクトリに戻る
+cd ..\..
+
+# index.html をエディタで開き、availableArticles 配列の先頭に新エピソードを追加
+# 以下の形式で追加:
+```
+
+```javascript
+const availableArticles = [
+  {
+    slug: 'github-agent-hq-unified-ai-coding-2025',  // ← 記事スラッグ
+    title: 'GitHub Agent HQ統合AI開発環境2025',    // ← 記事タイトル
+    thumbnail: 'audio-reader/web/github-agent-hq-thumbnail.jpg',  // ← サムネイルパス
+    publishDate: '2025/11/09',                       // ← 公開日（YYYY/MM/DD形式）
+    url: 'https://zenn.dev/dragonrondo/articles/github-agent-hq-unified-ai-coding-2025',  // ← Zenn記事URL
+    likes: 0                                         // ← 初期値は0
+  },
+  // ... 既存の記事 ...
+];
+```
+
+**確認項目:**
+- [ ] `availableArticles` 配列の**先頭**に新エピソードを追加した（最新記事が一番上）
+- [ ] `slug` が正しい（音声ファイルのディレクトリ名と一致）
+- [ ] `thumbnail` パスが正しい（`audio-reader/web/[スラッグ]-thumbnail.jpg`）
+- [ ] `publishDate` が正しい形式（YYYY/MM/DD）
+- [ ] `url` がZennの実際の記事URLと一致
+
+**🚨 注意:** `audio-player.html` ではなく、**ルートの `index.html`** を更新してください。GitHub Pagesはルートの `index.html` を公開します。
+
+---
+
+#### STEP 5: ローカル動作確認
+
+```bash
+# ローカルサーバー起動
+cd audio-reader
+Start-Process node -ArgumentList "server.js" -NoNewWindow
+
+# ブラウザで動作確認
+start http://localhost:8081/
+```
+
+**確認項目:**
+- [ ] 新エピソードが一覧の先頭に表示される
+- [ ] サムネイル画像が正しく表示される
+- [ ] 音声が正常に再生される（ja-male）
+- [ ] 音声切り替えが機能する（ja-male → ja-female → ja-normal）
+- [ ] 再生速度変更が機能する
+- [ ] コンソールエラーがない（F12 > Console で確認）
+
+**問題があった場合:** [トラブルシューティング](#トラブルシューティング) を参照
+
+---
+
+#### STEP 6: Git commit前チェックリスト
+
+```bash
+# ルートディレクトリに戻る
+cd ..
+
+# Git状態確認
+git status
+
+# 変更内容確認（重要！）
+git diff --stat
+
+# ⚠️ 以下を必ず確認:
+# - 記事ファイルが削除されていないこと（articles/が削除されていないこと）
+# - index.htmlで既存記事が削除されていないこと（追加のみであること）
+# - 音声ファイルが正しく追加されていること
+```
+
+**確認項目:**
+- [ ] `git status` で変更ファイルを確認した
+- [ ] `git diff --stat` で変更行数を確認した
+- [ ] 記事ファイルが削除されていない
+- [ ] index.htmlで既存エピソードが削除されていない
+- [ ] 音声ファイル6個（ja-male/female/normal各2個）が追加されている
+- [ ] サムネイル画像が追加されている
+
+**🚨 重要:** Git commit前に必ず `git diff --stat` で変更内容を確認してください。意図しない削除を防ぐために最も重要なステップです。
+
+---
+
+#### STEP 7: Git commit & push
+
+```bash
+# ファイルをステージング
+git add articles\$ARTICLE_SLUG.md
+git add audio-reader\audio\$ARTICLE_SLUG\
+git add audio-reader\web\$ARTICLE_SLUG-thumbnail.jpg
+git add index.html
+
+# コミット
+git commit -m @"
+新エピソード追加: GitHub Agent HQ統合AI開発環境2025
+
+変更ファイル:
+- articles/github-agent-hq-unified-ai-coding-2025.md - 記事ファイル追加
+- audio-reader/audio/github-agent-hq-unified-ai-coding-2025/ - 音声ファイル3種類生成（ja-male/female/normal）
+- audio-reader/web/github-agent-hq-thumbnail.jpg - サムネイル画像追加
+- index.html - 新エピソード情報追加（GitHub Pages公開用）
+
+主要成果:
+- 音声ファイル合計6個生成（各話者2チャンク）
+- GitHubブログからヒーロー画像を取得しサムネイル設定
+- ローカル動作確認完了
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+"@
+
+# プッシュ
+git push origin feature/article-audio-reader-clean
+```
+
+**確認項目:**
+- [ ] コミットメッセージに変更内容が詳細に記載されている
+- [ ] プッシュが成功した（エラーなし）
+- [ ] GitHubリポジトリで変更が反映されたことを確認
+
+---
+
+#### STEP 8: GitHub Pages デプロイ確認
+
+```bash
+# GitHub Actionsのビルド完了を待機（1-2分）
+Start-Sleep -Seconds 90
+
+# デプロイ確認（curlで確認）
+curl -s https://tenormusica2024.github.io/zenn-ai-news/ | Select-String $ARTICLE_SLUG
+
+# ブラウザで目視確認（キャッシュクリア必須）
+# 1. Ctrl+Shift+R でキャッシュクリア
+# 2. https://tenormusica2024.github.io/zenn-ai-news/ にアクセス
+start https://tenormusica2024.github.io/zenn-ai-news/
+```
+
+**確認項目:**
+- [ ] curlコマンドで記事スラッグが見つかった（デプロイ成功）
+- [ ] ブラウザで新エピソードが表示される（Ctrl+Shift+Rでキャッシュクリア後）
+- [ ] サムネイル画像が正しく表示される
+- [ ] 音声が正常に再生される
+- [ ] 音声切り替えが機能する
+- [ ] モバイル表示でも問題ない
+
+**問題があった場合:**
+1. GitHub Actionsのビルドログを確認: https://github.com/Tenormusica2024/zenn-ai-news/actions
+2. ビルドエラーがあれば修正してコミット→プッシュ
+3. キャッシュ問題の場合: 新規シークレットウィンドウで確認
+
+---
+
+### 🚨 絶対に忘れてはいけない重要事項
+
+#### ❌ よくある失敗パターン（これらを必ず避ける）
+
+1. **音声ファイルを1種類しか生成しない**
+   - 結果: ユーザーが音声切り替え時に404エラー
+   - 対策: 必ず3種類（ja-male/female/normal）すべて生成
+
+2. **汎用的なai-agents-thumbnail.jpgを使い回す**
+   - 結果: すべての記事が同じサムネイルになる
+   - 対策: 記事ごとに専用のサムネイルを設定
+
+3. **index.htmlの更新を忘れる**
+   - 結果: 音声ファイルは生成されたがGitHub Pagesに表示されない
+   - 対策: STEP 4を必ず実行
+
+4. **audio-player.htmlを更新してしまう**
+   - 結果: GitHub Pagesに反映されない（ルートのindex.htmlのみが公開される）
+   - 対策: 必ず**ルートの `index.html`** を更新
+
+5. **Git commit前に変更内容を確認しない**
+   - 結果: 既存記事が削除される、音声ファイルが正しく追加されない
+   - 対策: `git diff --stat` を必ず実行
+
+6. **GitHub Pagesデプロイ後にキャッシュクリアしない**
+   - 結果: 古いバージョンが表示される
+   - 対策: Ctrl+Shift+R または新規シークレットウィンドウで確認
+
+---
+
+### 📊 作業時間の目安
+
+| ステップ | 所要時間 |
+|---------|---------|
+| STEP 1: 記事ファイル準備 | 2分 |
+| STEP 2: 音声ファイル生成（3種類） | 1-1.5分 |
+| STEP 3: サムネイル画像設定 | 3-5分 |
+| STEP 4: index.html更新 | 2分 |
+| STEP 5: ローカル動作確認 | 3分 |
+| STEP 6: Git commit前チェック | 2分 |
+| STEP 7: Git commit & push | 1分 |
+| STEP 8: GitHub Pagesデプロイ確認 | 3分 |
+| **合計** | **約15-20分** |
+
+---
+
+### 🔄 次回作業時の参照
+
+**このワークフローを完了したら:**
+- [ ] 作業時間を記録（改善のため）
+- [ ] 問題が発生した場合は [トラブルシューティング](#トラブルシューティング) に追記
+- [ ] 自動化できる部分があれば scripts/ にスクリプト追加を検討
+
+**関連セクション:**
+- [環境構築手順](#環境構築手順) - 初回セットアップ時
+- [トラブルシューティング](#トラブルシューティング) - 問題発生時
+- [音声エンジン仕様](#音声エンジン仕様) - 音声生成の詳細
+- [自動化スクリプト](#自動化スクリプト) - 作業効率化ツール
+
+---
+
+## 自動化スクリプト
+
+### 概要
+
+手動作業を自動化し、ヒューマンエラーを防ぐためのNode.jsスクリプト群。
+
+### 利用可能なスクリプト
+
+#### 1. 音声一括生成スクリプト (`generate_all_audio.js`)
+
+**目的:** 3種類の音声ファイル（ja-male, ja-female, ja-normal）を1コマンドで自動生成
+
+**使用方法:**
+```bash
+cd audio-reader
+node scripts/generate_all_audio.js "../articles/[記事スラッグ].md"
+```
+
+**実行内容:**
+- ja-male音声生成（男性音声・デフォルト）
+- ja-female音声生成（女性音声）
+- ja-normal音声生成（標準音声・バックアップ）
+- 各音声の生成時間を計測
+- 生成結果サマリー表示
+- ファイル存在確認（最低6個のMP3ファイル）
+- 次のステップガイダンス表示
+
+**利点:**
+- 3種類の音声を1コマンドで生成（従来は3コマンド必要）
+- 進捗状況をリアルタイム表示
+- 生成時間を自動計測
+- エラー時のトラブルシューティングガイド自動表示
+- ファイル存在確認を自動実行
+
+**出力例:**
+```
+============================================================
+🚀 記事音声一括生成スクリプト
+============================================================
+📄 記事: ../articles/example.md
+🎙️  生成する音声: ja-male, ja-female, ja-normal
+============================================================
+
+... (各音声の生成ログ) ...
+
+============================================================
+✅ すべての音声生成が完了しました！
+============================================================
+
+【生成結果サマリー】
+  ✓ ja-male: 28.3秒
+  ✓ ja-female: 24.7秒
+  ✓ ja-normal: 26.1秒
+
+📊 合計所要時間: 79.1秒
+```
+
+---
+
+#### 2. 新エピソード追加スクリプト (`add_new_episode.js`)
+
+**目的:** index.htmlに新エピソードを安全に自動追加
+
+**使用方法:**
+```bash
+cd [プロジェクトルート]
+node audio-reader/scripts/add_new_episode.js \
+  --slug "article-slug" \
+  --title "記事タイトル" \
+  --date "2025-11-09" \
+  --url "https://zenn.dev/dragonrondo/articles/article-slug"
+```
+
+**実行内容:**
+- 重複チェック（同じスラッグが既に存在しないか確認）
+- 日付形式チェック（YYYY-MM-DD形式を検証）
+- バックアップ作成（index.html.backup）
+- availableArticles配列の先頭に新エピソード追加
+- git diffコマンドガイダンス表示
+
+**利点:**
+- 重複エピソードを自動検出
+- 日付形式を自動検証
+- バックアップを自動作成
+- 構文エラーを防止
+- 次のステップを自動提案
+
+**出力例:**
+```
+============================================================
+📝 index.html 更新スクリプト
+============================================================
+📄 ファイル: C:\...\zenn-ai-news\index.html
+📌 新エピソード: GitHub Agent HQ統合AI開発環境2025
+============================================================
+
+📦 バックアップ作成: C:\...\zenn-ai-news\index.html.backup
+✅ index.html 更新完了
+
+【追加された内容】
+      {
+        slug: 'github-agent-hq-unified-ai-coding-2025',
+        title: 'GitHub Agent HQ統合AI開発環境2025',
+        thumbnail: 'audio-reader/web/github-agent-hq-thumbnail.jpg',
+        publishDate: '2025/11/09',
+        url: 'https://zenn.dev/dragonrondo/articles/...',
+        likes: 0
+      },
+```
+
+---
+
+#### 3. デプロイ確認スクリプト (`verify_deployment.js`)
+
+**目的:** GitHub Pagesデプロイ後の動作を自動検証
+
+**使用方法:**
+```bash
+# 全エピソード確認
+node audio-reader/scripts/verify_deployment.js
+
+# 特定エピソード詳細確認
+node audio-reader/scripts/verify_deployment.js --slug "article-slug"
+```
+
+**実行内容:**
+- HTTPステータスコード確認（200 OK）
+- availableArticles配列の存在確認
+- 登録済みエピソード一覧表示
+- 新エピソードの存在確認（スラッグ指定時）
+- サムネイルパスの確認（スラッグ指定時）
+- 次のステップガイダンス表示
+
+**利点:**
+- デプロイ成功を自動確認
+- エピソード登録を自動検証
+- サムネイル設定を自動チェック
+- トラブルシューティングガイド自動表示
+- 全エピソード一覧を表示
+
+**出力例:**
+```
+============================================================
+🔍 GitHub Pages デプロイ確認スクリプト
+============================================================
+🌐 URL: https://tenormusica2024.github.io/zenn-ai-news/
+📌 確認対象スラッグ: github-agent-hq-unified-ai-coding-2025
+============================================================
+
+📡 HTMLを取得中...
+✅ ステータスコード: 200
+📄 HTMLサイズ: 125.47 KB
+✅ availableArticles 配列を確認
+
+📋 登録されているエピソード数: 5
+
+【登録済みエピソード一覧】
+  1. github-agent-hq-unified-ai-coding-2025
+  2. ai-agents-evolution-2025
+  ...
+
+🔍 スラッグ "github-agent-hq-unified-ai-coding-2025" の詳細確認:
+  ✅ エピソードが見つかりました
+  ✅ サムネイルパスが正しく設定されています
+```
+
+---
+
+### スクリプト配置場所
+
+```
+audio-reader/
+└── scripts/
+    ├── generate_all_audio.js         # 音声一括生成
+    ├── add_new_episode.js            # エピソード自動追加
+    ├── verify_deployment.js          # デプロイ自動検証
+    └── generate_article_audio.js     # 単一音声生成（既存）
+```
+
+---
+
+### 推奨ワークフロー（自動化スクリプト使用）
+
+```bash
+# STEP 2: 音声ファイル生成（自動化）
+cd audio-reader
+node scripts/generate_all_audio.js "../articles/article-slug.md"
+
+# STEP 4: index.html更新（自動化）
+cd ..
+node audio-reader/scripts/add_new_episode.js \
+  --slug "article-slug" \
+  --title "記事タイトル" \
+  --date "2025-11-09" \
+  --url "https://zenn.dev/dragonrondo/articles/article-slug"
+
+# STEP 7: Git commit & push（手動）
+git add .
+git commit -m "新エピソード追加: 記事タイトル"
+git push origin feature/article-audio-reader-clean
+
+# STEP 8: デプロイ確認（自動化）
+node audio-reader/scripts/verify_deployment.js --slug "article-slug"
+```
 
 ---
 
