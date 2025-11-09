@@ -216,6 +216,15 @@ Google Cloud TTSを使用する場合は、サービスアカウントキーが�
    cp /path/to/downloaded-key.json C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json
    ```
 
+   **🔍 既存ファイルの利用（実際のセットアップ例）:**
+   - 同じGCPプロジェクト（yt-transcript-demo-2025）を使用している場合、既存のservice-account-key.jsonを流用可能
+   - 例: AI FM Podcastプロジェクトのservice-account-keyを使用
+     ```bash
+     # ホームディレクトリにあるservice-account-key.jsonをコピー
+     cp "C:\Users\Tenormusica\UsersTenormusicaAI_FM_PODCAST_YOUTUBE_AUDIO_IMPLEMENTATION_20250930service-account-key.json" "C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json"
+     ```
+   - **動作確認済み**: 同じGCPプロジェクトのサービスアカウントであれば、異なるプロジェクトフォルダ間で共有可能
+
 3. **環境変数設定（自動設定済み）**
    - `generate_tts_audio.py`が自動的に`service-account-key.json`を読み込みます
    - 手動設定する場合: `set GOOGLE_APPLICATION_CREDENTIALS=C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json`
@@ -1733,6 +1742,18 @@ google.api_core.exceptions.PermissionDenied: 403 Caller does not have required p
    ```
 
 2. ファイルが存在しない場合:
+   
+   **方法A: 既存ファイルを流用（推奨・最速）**
+   - 同じGCPプロジェクト（yt-transcript-demo-2025）の他のservice-account-key.jsonを探す
+   ```bash
+   # ホームディレクトリで検索
+   ls -la ~/ | grep service
+   
+   # 見つかった場合はコピー
+   cp "~/UsersTenormusicaAI_FM_PODCAST_YOUTUBE_AUDIO_IMPLEMENTATION_20250930service-account-key.json" audio-reader/service-account-key.json
+   ```
+   
+   **方法B: 新規ダウンロード**
    - Google Cloud Consoleからサービスアカウントキーをダウンロード
    - `audio-reader/service-account-key.json`に配置
 
