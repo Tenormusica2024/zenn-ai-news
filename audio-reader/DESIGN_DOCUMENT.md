@@ -2160,4 +2160,230 @@ sleep 60
 
 ---
 
+### Q8. GitHub Pagesに新エピソードが表示されない
+
+**発生日**: 2025/11/09  
+**セッション**: feature/article-audio-reader-clean ブランチでの新エピソード追加
+
+#### 症状
+
+GitHub Pagesに新しいエピソードを追加したが、https://tenormusica2024.github.io/zenn-ai-news/ で表示されない。
+
+**実施した作業:**
+1. `feature/article-audio-reader-clean` ブランチに新エピソード音声ファイルを追加・コミット・プッシュ
+2. `audio-reader/web/audio-player.html` の `availableArticles` 配列に新エピソード情報を追加・コミット・プッシュ
+3. GitHub Pagesのビルドが完了するまで待機
+
+**問題:**
+上記作業後もGitHub Pagesに新エピソードが表示されない。
+
+#### 根本原因
+
+**誤ったファイルを編集していた。**
+
+- ❌ 編集したファイル: `audio-reader/web/audio-player.html`
+- ✅ 正しいファイル: **`index.html`** (リポジトリルート)
+
+**GitHub Pagesはリポジトリルートの `index.html` を公開**するため、サブディレクトリの `audio-player.html` を編集しても反映されない。
+
+#### ファイル構造の理解
+
+```
+zenn-ai-news/
+├── index.html                        ← GitHub Pagesが公開（正しいファイル）
+├── audio-reader/
+│   └── web/
+│       └── audio-player.html         ← これを編集しても反映されない
+└── audio/
+    └── github-agent-hq-unified-ai-coding-2025/
+        ├── article_ja-normal_chunk_01.mp3
+        ├── article_ja-normal_chunk_02.mp3
+        └── playlist.json
+```
+
+**GitHub Pagesの公開ルール:**
+1. リポジトリルートの `index.html` がエントリーポイント
+2. サブディレクトリの `.html` ファイルは直接URLでアクセス可能だが、自動的には公開されない
+3. JavaScript内で定義された `availableArticles` 配列は、**公開される `index.html` 内**に記述する必要がある
+
+#### 対処法
+
+**ステップ1: 正しいファイルを確認**
+```bash
+cd "C:\Users\Tenormusica\Documents\zenn-ai-news"
+
+# リポジトリルートに index.html が存在するか確認
+ls -la index.html
+
+# GitHub Pagesの公開対象を確認
+# （ブラウザでアクセスする実際のファイル）
+```
+
+**ステップ2: リポジトリルートの `index.html` を編集**
+```bash
+# ルートの index.html 内の availableArticles を確認
+grep -n "const availableArticles" index.html
+
+# 正しいファイルを編集して新エピソードを追加
+# （Read → Edit → Commit → Push）
+```
+
+**ステップ3: 変更をコミット・プッシュ**
+```bash
+git add index.html
+git commit -m "index.htmlに新エピソード追加（GitHub Pages公開用）"
+git push origin feature/article-audio-reader-clean
+```
+
+**ステップ4: GitHub Pagesビルド完了を待機**
+```bash
+# 1-2分待機後、キャッシュクリアして確認
+# Ctrl+Shift+R（強制リフレッシュ）
+```
+
+#### コード修正内容
+
+**変更ファイル:** `index.html` (リポジトリルート)
+
+**変更箇所:** Line 722 - `availableArticles` 配列
+
+**修正前:**
+```javascript
+const availableArticles = [
+  {
+    slug: 'affinity-3-free-canva-ai-strategy-2025',
+    title: 'Affinity無料化でCanvaのAI戦略が明らかに',
+    thumbnail: 'audio-reader/web/affinity-thumbnail.jpg',
+    publishDate: '2025/11/06',
+    url: 'https://zenn.dev/dragonrondo/articles/affinity-3-free-canva-ai-strategy-2025',
+    likes: 0
+  },
+  {
+    slug: 'ai-agents-70-percent-failure-reality-2025',
+    title: 'AIエージェントの70%が失敗する現実',
+    thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
+    publishDate: '2025/11/07',
+    url: 'https://zenn.dev/dragonrondo/articles/ai-agents-70-percent-failure-reality-2025',
+    likes: 0
+  }
+];
+```
+
+**修正後:**
+```javascript
+const availableArticles = [
+  {
+    slug: 'github-agent-hq-unified-ai-coding-2025',
+    title: 'GitHub Agent HQ統合AI開発環境2025',
+    thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
+    publishDate: '2025/11/09',
+    url: 'https://zenn.dev/dragonrondo/articles/github-agent-hq-unified-ai-coding-2025',
+    likes: 0
+  },
+  {
+    slug: 'ai-agents-70-percent-failure-reality-2025',
+    title: 'AIエージェントの70%が失敗する現実',
+    thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
+    publishDate: '2025/11/07',
+    url: 'https://zenn.dev/dragonrondo/articles/ai-agents-70-percent-failure-reality-2025',
+    likes: 0
+  },
+  {
+    slug: 'affinity-3-free-canva-ai-strategy-2025',
+    title: 'Affinity無料化でCanvaのAI戦略が明らかに',
+    thumbnail: 'audio-reader/web/affinity-thumbnail.jpg',
+    publishDate: '2025/11/06',
+    url: 'https://zenn.dev/dragonrondo/articles/affinity-3-free-canva-ai-strategy-2025',
+    likes: 0
+  }
+];
+```
+
+**変更内容:**
+1. 新エピソード `github-agent-hq-unified-ai-coding-2025` を配列の先頭に追加
+2. エピソードを日付順（新→旧）に並べ替え
+3. サムネイル画像は既存の `ai-agents-thumbnail.jpg` を一時的に使用
+
+#### コミット情報
+
+- **コミット1 (音声ファイル追加)**: `c7ff7ea`
+- **コミット2 (audio-player.html更新・誤り)**: `a12dbdc`
+- **コミット3 (index.html更新・正解)**: `d061628`
+- **ブランチ**: `feature/article-audio-reader-clean`
+
+#### 教訓と今後の対策
+
+**今回の失敗の本質:**
+
+1. **ファイル構造の理解不足**
+   - GitHub Pagesの公開構造を確認せずに作業を開始
+   - `index.html` と `audio-player.html` の役割を混同
+
+2. **動作検証の欠如**
+   - 変更後に実際のGitHub Pages URLで確認しなかった
+   - 「コミット・プッシュ = 完了」という誤った認識
+
+3. **FALSE SUCCESS CLAIMS（虚偽の成功報告）**
+   - 間違ったファイルを編集したのに「完了」と報告
+   - 実際の動作確認を怠ったまま成功を宣言
+
+**今後の必須プロトコル:**
+
+1. **デプロイ前の構造確認**
+   ```bash
+   # 公開対象ファイルを必ず確認
+   ls -la index.html
+   # GitHub Pages設定を確認（Settings > Pages）
+   ```
+
+2. **デプロイ後の必須動作確認**
+   ```bash
+   # 1-2分待機後、実際のURLで確認
+   curl -s https://tenormusica2024.github.io/zenn-ai-news/ | grep "github-agent-hq"
+   # または
+   # ブラウザでCtrl+Shift+R（キャッシュクリア）して目視確認
+   ```
+
+3. **FALSE SUCCESS CLAIMSの完全禁止**
+   - 実際の公開URLで動作確認するまで「完了」と報告しない
+   - 「技術的実装完了」≠「ユーザーに見える状態」を常に意識
+   - 確認できない場合は正直に「未確認」と報告
+
+**ベストプラクティス:**
+
+```bash
+# 新エピソード追加の正しいワークフロー
+
+# 1. ファイル構造確認
+ls -la index.html audio-reader/web/audio-player.html
+
+# 2. GitHub Pagesの公開設定確認（どのファイルが公開されているか）
+# GitHub Settings > Pages > Source > Branch & Path
+
+# 3. 正しいファイル（index.html）を編集
+# Read → Edit → Commit → Push
+
+# 4. GitHub Pagesビルド待機（1-2分）
+
+# 5. 動作確認（必須）
+curl -s https://tenormusica2024.github.io/zenn-ai-news/ | grep "新エピソード名"
+
+# 6. ブラウザで目視確認（Ctrl+Shift+Rでキャッシュクリア）
+
+# 7. 動作確認完了後に初めて「完了」報告
+```
+
+#### 参考情報
+
+**GitHub Pagesの基本:**
+- [GitHub Pages Documentation](https://docs.github.com/en/pages)
+- デフォルトの公開ファイル: `index.html`, `README.md`
+- ブランチ単位で公開設定が可能（Settings > Pages > Source）
+
+**関連トラブルシューティング:**
+- Q1-Q7: 音声生成・再生関連の問題
+- Q8（本項目）: GitHub Pages公開構造の理解
+
+---
+
 **END OF DOCUMENT**
