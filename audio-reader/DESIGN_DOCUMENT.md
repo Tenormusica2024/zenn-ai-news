@@ -681,6 +681,64 @@ node server.js
 
 ## トラブルシューティング
 
+### 🖼️ CRITICAL: 新規記事のサムネイル画像設定手順
+
+**すべての新規記事について、記事内容に合ったサムネイル画像を必ず設定すること:**
+
+**1. Web検索で記事に関連する画像を探す**
+
+```bash
+# WebSearchで記事のトピックに関連する公式記事・ブログを検索
+# 例: "GitHub Agent HQ unified AI coding environment 2025"
+```
+
+**2. 公式ソースから適切な画像URLを取得**
+
+```bash
+# WebFetchで公式記事のHTMLを取得し、ヒーロー画像・メイン画像のURLを抽出
+# 優先順位:
+# 1. 公式ブログのヒーロー画像
+# 2. プロダクトページのメイン画像
+# 3. GitHubリポジトリのOGP画像
+```
+
+**3. 画像をダウンロードして配置**
+
+```bash
+cd C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\web
+
+# curlで画像をダウンロード（記事スラッグ名-thumbnail.jpgの形式）
+curl -o [記事スラッグ]-thumbnail.jpg "[画像URL]"
+
+# 例:
+curl -o github-agent-hq-thumbnail.jpg "https://github.blog/wp-content/uploads/2025/10/UniverseBlogHeader_07.jpg"
+```
+
+**4. index.htmlのサムネイルパスを更新**
+
+```javascript
+// index.html の availableArticles 配列内で該当記事のサムネイルパスを更新
+{
+  slug: 'github-agent-hq-unified-ai-coding-2025',
+  title: 'GitHub Agent HQ統合AI開発環境2025',
+  thumbnail: 'audio-reader/web/github-agent-hq-thumbnail.jpg', // ← ここを更新
+  publishDate: '2025/11/09',
+  url: 'https://zenn.dev/dragonrondo/articles/github-agent-hq-unified-ai-coding-2025',
+  likes: 0
+}
+```
+
+**画像選定の基準:**
+- 記事内容を視覚的に表現している
+- 高解像度（最低1200x630px推奨）
+- 公式ソースからの引用（著作権問題を回避）
+- OGP画像として適切なアスペクト比
+
+**🚨 注意事項:**
+- **汎用的なai-agents-thumbnail.jpgは使用禁止** - 記事ごとに専用のサムネイルを設定すること
+- 著作権を確認（公式ブログ・プロダクトページからの引用を優先）
+- ファイル名は記事スラッグと対応させる（例: `[slug]-thumbnail.jpg`）
+
 ### 🚨 CRITICAL: 新規記事の音声生成必須手順
 
 **すべての新規記事について、以下の3種類の音声を必ず生成すること:**
