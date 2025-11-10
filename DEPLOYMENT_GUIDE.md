@@ -369,6 +369,49 @@ Error: Branch not found
 
 ## 📚 開発履歴とナレッジベース
 
+### 2025-11-10: サムネイル画像取得プロセス追加
+
+#### サムネイル画像の作成方法
+
+**🚨 CRITICAL: ウェブ上から記事に最適な画像を取得する**
+
+1. **WebSearch実行**
+   - 記事のトピックに関連するキーワードで画像検索
+   - 例: `ChatGPT vulnerability HackedGPT security image thumbnail 2025`
+
+2. **WebFetch実行**
+   - 検索結果の記事URLから画像URLを抽出
+   - メイン画像・サムネイル画像を優先的に抽出
+
+3. **画像ダウンロード**
+   ```bash
+   cd "C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\web"
+   curl -o [記事スラッグ]-thumbnail.jpg "[画像URL]"
+   ```
+
+4. **Read ツールで画像確認**
+   - ダウンロードした画像の内容を視覚的に確認
+   - 記事の内容に適しているか判定
+
+**絶対禁止事項:**
+- ❌ SVGで画像を作成する
+- ❌ Pythonで画像を生成する
+- ❌ ローカルで画像を作成する
+
+**推奨される画像ソース:**
+- ✅ The Hacker News記事の画像
+- ✅ セキュリティメディアの記事画像
+- ✅ 公式ブログの画像
+- ✅ 著作権的に問題のないニュース画像
+
+#### 実装例（2025-11-10）
+
+**記事:** ChatGPT脆弱性「HackedGPT」  
+**画像ソース:** The Hacker News記事  
+**画像URL:** https://blogger.googleusercontent.com/img/.../openai.jpg  
+**画像内容:** OpenAIロゴが表示されたスマートフォンとサイバーセキュリティ環境  
+**ファイルサイズ:** 41KB  
+
 ### 2025-11-09: GitHub Pages デプロイ完了
 
 #### 実施内容
