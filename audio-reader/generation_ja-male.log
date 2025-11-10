@@ -1,0 +1,18 @@
+音声生成開始: 日本語（男性） (ja-male)
+Python実行: C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\venv_kokoro\Scripts\python.exe
+スクリプト: C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\scripts\generate_tts_audio.py
+�L���ǂݍ���: ../articles/github-agent-hq-unified-ai-coding-2025.md
+�b��: ���{��i�j���j (ja-male)
+[OK] �L���t�@�C������: ����
+���o�����e�L�X�g��: 2645���� (6879�o�C�g)
+�e�L�X�g��2�̃`�����N�ɕ������܂���
+Google Cloud TTS��������...
+����������... (1/2) - 1680����
+����������... (2/2) - 963����
+
+[OK] �����t�@�C����������: 2�t�@�C��
+�o�͐�: C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\audio\github-agent-hq-unified-ai-coding-2025
+
+音声生成完了（Google Cloud TTS）
+
+✓ すべての処理が完了しました

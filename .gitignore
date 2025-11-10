@@ -1,7 +1,3 @@
 node_modules
 .DS_Store
 audio-reader/venv_kokoro/
-
-# Google Cloud Service Account Keys (CRITICAL: 絶対にコミットしない)
-**/service-account-key*.json
-service-account-key*.json

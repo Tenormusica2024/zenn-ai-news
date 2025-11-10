@@ -1,5 +1,22 @@
 # Zenn記事音声朗読システム 設計書
 
+**このドキュメントはシステム概要・技術仕様・環境構築を説明します。記事追加・デプロイ・エラー対応は [COMPLETE_WORKFLOW.md](./COMPLETE_WORKFLOW.md) を参照してください。**
+
+---
+
+## 🚀 クイックスタート
+
+**新規記事を追加する場合:**
+→ [COMPLETE_WORKFLOW.md](./COMPLETE_WORKFLOW.md) の「新規記事追加の完全ワークフロー」セクションを参照
+
+**エラーが発生した場合:**
+→ [COMPLETE_WORKFLOW.md](./COMPLETE_WORKFLOW.md) の「トラブルシューティング」セクションを参照
+
+**自動化スクリプトを使う場合:**
+→ [COMPLETE_WORKFLOW.md](./COMPLETE_WORKFLOW.md) の「自動化スクリプトの使用方法」セクションを参照
+
+---
+
 ## 📋 目次
 
 1. [システム概要](#システム概要)
@@ -10,601 +27,9 @@
 6. [音声エンジン仕様](#音声エンジン仕様)
 7. [実装詳細](#実装詳細)
 8. [API仕様](#api仕様)
-9. [トラブルシューティング](#トラブルシューティング)
 
 ---
 
-## システム概要
-
-### 目的
-
-Zenn記事をMarkdown形式から音声ファイルに変換し、Webブラウザで朗読再生できるシステム。
-
-### 主要機能
-
-1. **Markdown→音壵変換**
-   - frontmatter、コードブロック、URL等の除去
-   - 本文テキストのみを抽出
-   - チャンク分割対応（5000バイト制限対応）
-   - 複数の音声エンジンに対応
-
-2. **音声エンジン選択**
-   - **Google Cloud TTS (Text-to-Speech)**: 高品質Neural2音声・有料（無料枠あり）・推奨
-   - **VOICEVOX**: 高品質・多様な声・処理重い・無料
-
-3. **Webプレイヤー**
-   - ダークモード対応UI
-   - 再生速度変更（0.5x〜2.0x）
-   - ナレーター切り替え
-   - プログレスバー・シーク機能
-
-### パフォーマンス比較
-
-| 項目 | Google Cloud TTS | VOICEVOX |
-|------|----------|----------|
-| ファイルサイズ | 約6-10MB (MP3) | 20-30MB (WAV) |
-| 処理速度 | 高速（10-20秒程度） | 低速（1分以上） |
-| CPU/メモリ負荷 | 低（API経由） | 高 |
-| 音声品質 | Neural2: 高品質 / Standard: 標準的 | 高品質 |
-| オフライン動作 | 不可 | 可能 |
-| ライセンス | 有料（無料枠: 400万文字/月） | 無料（商用可） |
-| 制限 | 5000バイト/リクエスト（チャンク分割対応済み） | なし |
-
----
-
-## アーキテクチャ
-
-### システム構成図
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   ユーザー操作                            │
-│              (ブラウザ: audio-player.html)               │
-└─────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────┐
-│                   HTTPサーバー                            │
-│                   (server.js)                            │
-└─────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────┐
-│              音声ファイル + playlist.json                 │
-│                  (audio/記事名/)                         │
-└─────────────────────────────────────────────────────────┘
-                            ↑
-                            │
-┌─────────────────────────────────────────────────────────┐
-│            音声生成統合スクリプト                          │
-│          (generate_article_audio.js)                     │
-└─────────────────────────────────────────────────────────┘
-                ┌───────────┴───────────┐
-                ↓                       ↓
-┌──────────────────────┐   ┌──────────────────────┐
-│   gTTS Python        │   │   VOICEVOX Node.js   │
-│   (gtts_article_     │   │   (article_to_       │
-│    to_speech.py)     │   │    speech.js)        │
-└──────────────────────┘   └──────────────────────┘
-```
-
-### データフロー
-
-```
-1. Markdown記事
-   ↓
-2. テキスト抽出（frontmatter除去、整形）
-   ↓
-3. 音声エンジン選択
-   ├─ gTTS: Google翻訳API経由で音声生成
-   └─ VOICEVOX: ローカルサーバーで音声生成
-   ↓
-4. 音声ファイル保存 (MP3 or WAV)
-   ↓
-5. playlist.json生成（メタデータ）
-   ↓
-6. Webプレイヤーで再生
-```
-
----
-
-## 技術スタック
-
-### バックエンド
-
-| 技術 | バージョン | 用途 |
-|------|----------|------|
-| **Node.js** | v18以上（動作確認: v22.18.0） | 統合スクリプト・HTTPサーバー |
-| **Python** | 3.10+ | Google Cloud TTS音声生成 |
-| **Google Cloud TTS** | API v1 | 高品質Neural2音声生成（メイン） |
-| **VOICEVOX** | 0.24.1 | 高品質音声生成（オプション） |
-
-### Pythonパッケージ（`requirements.txt`）
-
-```txt
-google-cloud-texttospeech>=2.16.0  # Google Cloud TTSメインパッケージ
-# 依存パッケージ（自動インストール）:
-# - protobuf
-# - googleapis-common-protos
-# - grpcio
-# - google-auth
-# - google-api-core
-```
-
-**インストール方法:**
-```bash
-pip install -r requirements.txt
-```
-
-### フロントエンド
-
-| 技術 | 用途 |
-|------|------|
-| HTML5 Audio API | 音声再生 |
-| Vanilla JavaScript | UI制御 |
-| CSS3 (Gradient) | ダークモードデザイン |
-
----
-
-## 環境構築手順
-
-### 前提条件確認
-
-以下のコマンドを実行して、必要なバージョンがインストールされているか確認してください。
-
-```bash
-# Node.jsバージョン確認
-node --version
-# v18.0.0以上が必要（確認済み動作バージョン: v22.18.0）
-
-# Pythonバージョン確認
-python --version
-# Python 3.10.0以上が必要
-
-# インターネット接続確認（gTTS使用時に必要）
-ping google.com -n 1
-```
-
-**バージョンが古い場合**:
-- Node.js: https://nodejs.org/ からLTS版をダウンロード
-- Python: https://www.python.org/downloads/ から3.10以上をダウンロード
-
-### 1. プロジェクトクローン
-
-```bash
-git clone [リポジトリURL]
-cd zenn-ai-news/audio-reader
-```
-
-### 2. Python仮想環境構築とGoogle Cloud TTS設定
-
-#### 2-1. Python仮想環境構築
-
-```bash
-# 仮想環境作成
-python -m venv venv_kokoro
-
-# 仮想環境有効化（Windows）
-venv_kokoro\Scripts\activate
-
-# 仮想環境有効化（Mac/Linux）
-source venv_kokoro/bin/activate
-
-# パッケージインストール（Google Cloud TTS - 推奨）
-pip install google-cloud-texttospeech
-
-# または gTTS（軽量・無料の代替手段）
-# pip install gTTS
-```
-
-#### 2-2. Google Cloud TTS認証設定（推奨）
-
-Google Cloud TTSを使用する場合は、サービスアカウントキーが必要です。
-
-**手順:**
-
-1. **Google Cloud Consoleでサービスアカウントキーを取得**
-   - https://console.cloud.google.com/ にアクセス
-   - プロジェクトを選択（または新規作成）
-   - 「APIとサービス」→「認証情報」→「サービスアカウントキーを作成」
-   - JSON形式でダウンロード
-
-2. **キーファイルを配置**
-   ```bash
-   # audio-readerディレクトリに配置
-   # ファイル名: service-account-key.json
-   cp /path/to/downloaded-key.json C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json
-   ```
-
-   **🔍 既存ファイルの利用:**
-   
-   ⚠️ **セキュリティ警告**: 
-   - 異なるプロジェクト間でのサービスアカウントキー共有は**セキュリティのベストプラクティスに反します**
-   - 各プロジェクト専用のサービスアカウントを作成し、最小権限の原則に従うことを強く推奨
-   - 以下は緊急対応時のワークアラウンドであり、**推奨される方法ではありません**
-   
-   **緊急時の暫定対応（非推奨）:**
-   - 同じGCPプロジェクトの既存service-account-key.jsonを一時的に流用可能
-     ```bash
-     # ホームディレクトリで既存のキーファイルを検索
-     ls -la ~/ | grep service-account-key
-     
-     # 見つかった場合は一時的にコピー（本番環境では使用禁止）
-     cp "~/[既存のservice-account-keyファイル]" "audio-reader/service-account-key.json"
-     ```
-   
-   **🔒 推奨される正しい手順:**
-   1. GCP Consoleで新規サービスアカウント作成
-   2. 必要最小限の権限のみ付与（`roles/cloudtexttospeech.user`）
-   3. 新規キーを生成して`audio-reader/service-account-key.json`に配置
-   4. 古いキーは即座に無効化
-
-3. **環境変数設定（自動設定済み）**
-   - `generate_tts_audio.py`が自動的に`service-account-key.json`を読み込みます
-   - 手動設定する場合: `set GOOGLE_APPLICATION_CREDENTIALS=C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json`
-
-**注意事項:**
-- ✅ **Google Cloud TTS**: 高品質Neural2音声、有料（無料枠: 400万文字/月）、推奨
-- ⚠️ **gTTS**: Google翻訳API使用、無料・無制限だが音声品質は標準的、認証不要
-- gTTSは認証設定が不要なため、service-account-key.jsonがない場合の代替手段として使用可能
-
-### 3. VOICEVOX導入（オプション）
-
-高品質音声が必要な場合のみ導入。
-
-```bash
-# 1. VOICEVOX公式サイトからダウンロード
-# https://voicevox.hiroshiba.jp/
-
-# 2. インストーラーを実行
-# - Windowsの場合: VOICEVOX-Windows-*.exe をダブルクリック
-# - Macの場合: VOICEVOX-Mac-*.dmg を開いてアプリケーションフォルダにドラッグ
-
-# 3. VOICEVOXアプリケーションを起動
-# - Windowsの場合: スタートメニュー → VOICEVOX
-
-# 4. APIサーバーの起動確認（重要）
-# VOICEVOXのメニューバー → 「設定」 → 「エンジン」タブ
-# 「HTTPサーバーを起動する」にチェックが入っていることを確認
-# ポート番号が50021であることを確認
-
-# 5. APIサーバー動作確認
-curl http://localhost:50021/version
-# 成功例: {"version":"0.24.1"}
-# 失敗例: curl: (7) Failed to connect to localhost port 50021
-#   → VOICEVOXの設定で「HTTPサーバーを起動する」を有効化してください
-```
-
-### 4. Node.js依存関係（不要）
-
-HTTPサーバーは標準ライブラリのみで動作するため、`npm install`不要。
-
-### 5. 動作確認
-
-```bash
-# 1. HTTPサーバー起動（このターミナルは起動したまま維持）
-node server.js
-# → Server running at http://localhost:8081/
-
-# 2. ブラウザでアクセス（別タブまたは新しいウィンドウを開く）
-# http://localhost:8081/
-
-# または直接プレイヤーにアクセス
-# http://localhost:8081/web/audio-player.html
-
-# 注意: 
-# - サーバーを停止する場合は Ctrl+C を押す
-# - 音声ファイルが存在しない場合はエラーが表示されます
-# - 音声ファイル生成については「付録A」の「3. 音声生成テスト」を参照
-```
-
----
-
-## ディレクトリ構造
-
-```
-audio-reader/
-├── audio/                          # 生成音声ファイル格納
-│   └── [記事名]/
-│       ├── article_ja-normal.mp3   # gTTS音声
-│       ├── article_zundamon.wav    # VOICEVOX音声
-│       └── playlist.json           # メタデータ
-│
-├── scripts/                        # 音声生成スクリプト
-│   ├── generate_article_audio.js  # 統合スクリプト（推奨）
-│   ├── gtts_article_to_speech.py  # gTTS実装
-│   └── article_to_speech.js       # VOICEVOX実装
-│
-├── web/                            # Webプレイヤー
-│   ├── audio-player.html          # メインUI
-│   └── affinity-thumbnail.jpg     # サムネイル画像
-│
-├── venv_kokoro/                    # Python仮想環境
-│   ├── Lib/                        # Pythonライブラリ（共通）
-│   ├── Scripts/                    # 実行ファイル（Windows）
-│   │   ├── python.exe              # Python実行ファイル
-│   │   ├── pip.exe                 # パッケージマネージャー
-│   │   ├── activate.bat            # 仮想環境有効化（バッチ）
-│   │   └── Activate.ps1            # 仮想環境有効化（PowerShell）
-│   └── bin/                        # 実行ファイル（Mac/Linux）
-│       ├── python                  # Python実行ファイル
-│       ├── pip                     # パッケージマネージャー
-│       └── activate                # 仮想環境有効化
-│
-├── server.js                       # HTTPサーバー
-└── DESIGN_DOCUMENT.md              # 本ドキュメント
-```
-
----
-
-## 音声エンジン仕様
-
-### gTTS (Google Text-to-Speech)
-
-#### 特徴
-
-- **軽量**: 外部API呼び出しでローカル処理不要
-- **高速**: 10秒程度で3600文字の音声生成完了
-- **無料**: Google翻訳API使用、無制限
-- **制限**: インターネット接続必須、音声品質は標準的
-
-#### 出力仕様
-
-- **フォーマット**: MP3
-- **サンプリングレート**: 24kHz
-- **ビットレート**: 可変（VBR）
-- **ファイルサイズ**: 約1.5KB/文字（3600文字→5.4MB）
-
-#### スクリプト仕様
-
-**ファイル**: `scripts/gtts_article_to_speech.py`
-
-**使用方法**:
-```bash
-python gtts_article_to_speech.py <記事パス> [話者キー]
-
-# 実際の記事ファイルを使用した例
-python gtts_article_to_speech.py ../articles/affinity-3-free-canva-ai-strategy-2025.md ja-normal
-
-# 一般的な例
-python gtts_article_to_speech.py ../articles/[記事名].md ja-normal
-```
-
-**話者キー**:
-- `ja-normal`: 日本語標準音声（デフォルト）
-
-**処理フロー**:
-1. Markdown読み込み
-2. frontmatter除去
-3. 見出し記号、コードブロック、URL除去
-4. gTTS APIで音声生成
-5. MP3ファイル保存
-6. playlist.json生成
-
----
-
-### VOICEVOX
-
-#### 特徴
-
-- **高品質**: 感情表現豊かな音声
-- **多様性**: 複数のキャラクターボイス
-- **オフライン**: ローカル処理で完結
-- **重い**: CPU/メモリ負荷大、処理時間1分以上
-
-#### 出力仕様
-
-- **フォーマット**: WAV
-- **サンプリングレート**: 24kHz
-- **ビット深度**: 16bit
-- **ファイルサイズ**: 約7KB/文字（3600文字→25MB）
-
-#### スクリプト仕様
-
-**ファイル**: `scripts/article_to_speech.js`
-
-**使用方法**:
-```bash
-node article_to_speech.js <記事パス> [話者キー]
-
-# デフォルト（zundamon）で生成
-node article_to_speech.js ../articles/article.md
-
-# 明示的にzundamonを指定（推奨）
-node article_to_speech.js ../articles/article.md zundamon
-```
-
-**話者キー**:
-- `zundamon`: ずんだもん（ノーマル） - ID: 3（**デフォルト、推奨：軽量・高速**）
-- `no7-reading`: No.7（読み聞かせ） - ID: 31（非推奨：処理が非常に重い）
-- `aoyama-calm`: 青山龍星（しっとり） - ID: 84（非推奨：処理が重い）
-
-**注意**: speaker IDはVOICEVOXのバージョンにより異なる場合があります。正確なIDは以下のコマンドで確認できます:
-```bash
-curl http://localhost:50021/speakers
-```
-
-**前提条件**:
-- VOICEVOXアプリケーション起動中
-- APIサーバー: http://localhost:50021
-
----
-
-## 実装詳細
-
-### 統合スクリプト: `generate_article_audio.js`
-
-#### 目的
-
-音声エンジンの選択を自動化し、単一のコマンドで音声生成を実行。
-
-#### 実装コード（抜粋）
-
-```javascript
-const AVAILABLE_SPEAKERS = {
-  // gTTS（軽量・高速）
-  'ja-normal': { 
-    type: 'gtts', 
-    name: 'Google翻訳音声（標準）', 
-    description: '軽量・高速なGoogle TTS' 
-  },
-  // VOICEVOX（高品質だが重い）
-  'zundamon': { 
-    type: 'voicevox', 
-    id: 3, 
-    name: 'ずんだもん（ノーマル）', 
-    description: '親しみやすい声' 
-  }
-};
-
-async function generateAudio(articlePath, speakerKey) {
-  const speaker = AVAILABLE_SPEAKERS[speakerKey];
-  
-  if (speaker.type === 'gtts') {
-    // Python venv経由でgTTSスクリプト実行
-    await runPythonScript('gtts_article_to_speech.py', articlePath, speakerKey);
-  } else if (speaker.type === 'voicevox') {
-    // Node.jsでVOICEVOXスクリプト実行
-    await runVoicevoxScript(articlePath, speakerKey);
-  }
-}
-
-function runPythonScript(scriptName, articlePath, speakerKey) {
-  const pythonPath = path.join(__dirname, '..', 'venv_kokoro', 'Scripts', 'python.exe');
-  const process = spawn(pythonPath, [scriptPath, articlePath, speakerKey]);
-  // ...
-}
-```
-
-#### 使用方法
-
-```bash
-cd scripts
-
-# gTTS（推奨：軽量・高速） - 実際の例
-node generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" ja-normal
-
-# VOICEVOX（高品質だが重い） - 実際の例
-node generate_article_audio.js "../articles/affinity-3-free-canva-ai-strategy-2025.md" zundamon
-
-# 一般的な例
-node generate_article_audio.js "../articles/[記事名].md" ja-normal
-```
-
----
-
-### Markdown→テキスト抽出ロジック
-
-両スクリプト共通の処理。
-
-#### 処理内容
-
-```python
-# Python版（gtts_article_to_speech.py）
-def extract_text_from_markdown(markdown):
-    # 1. frontmatter除去
-    text = re.sub(r'^---\n[\s\S]*?\n---\n', '', markdown)
-    
-    # 2. 参照元セクション除去
-    text = re.sub(r'^##\s*参照元\n[\s\S]*?(?=\n##\s)', '', text, flags=re.MULTILINE)
-    
-    # 3. 見出し記号除去（#, ##, ### 等）
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-    
-    # 4. リンク記法を文字列に変換 [テキスト](URL) → テキスト
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-    
-    # 5. 太字・斜体記号除去
-    text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', text)
-    text = re.sub(r'\*([^\*]+)\*', r'\1', text)
-    
-    # 6. コードブロック除去
-    text = re.sub(r'```[\s\S]*?```', '', text)
-    text = re.sub(r'`([^`]+)`', r'\1', text)
-    
-    # 7. URLのみの行を除去
-    text = re.sub(r'^https?://.*$', '', text, flags=re.MULTILINE)
-    
-    # 8. 複数の空行を1つに
-    text = re.sub(r'\n\n+', '\n\n', text)
-    
-    # 9. 箇条書き記号除去
-    text = re.sub(r'^[-*]\s+', '', text, flags=re.MULTILINE)
-    
-    return text.strip()
-```
-
-#### 入力例
-
-```markdown
----
-title: "記事タイトル"
-emoji: "📝"
----
-
-# はじめに
-
-[リンクテキスト](https://example.com)
-
-**太字** *斜体*
-
-```javascript
-console.log('code');
-```
-
-https://example.com
-
-- 箇条書き1
-- 箇条書き2
-```
-
-#### 出力例
-
-```
-はじめに
-
-リンクテキスト
-
-太字 斜体
-
-箇条書き1
-箇条書き2
-```
-
----
-
-### playlist.json仕様
-
-#### 目的
-
-音声ファイルのメタデータ管理。Webプレイヤーがファイル情報を取得。
-
-#### フォーマット
-
-```json
-{
-  "article": "記事ファイル名.md",
-  "speaker": "ja-normal",
-  "speakerName": "日本語（標準）",
-  "chunks": [
-    "article_ja-normal.mp3"
-  ],
-  "totalChunks": 1,
-  "engine": "gTTS",
-  "createdAt": "2025-11-08T19:53:29.908580"
-}
-```
-
-#### フィールド説明
-
-| フィールド | 型 | 説明 |
-|----------|---|------|
-| `article` | string | 元記事ファイル名 |
-| `speaker` | string | 話者キー（ja-normal, zundamon等） |
-| `speakerName` | string | 話者表示名 |
-| `chunks` | array | 音声ファイル名リスト（現在は常に1ファイル） |
-| `totalChunks` | number | チャンク数（現在は常に1） |
-| `engine` | string | 使用エンジン（gTTS, VOICEVOX） |
 | `createdAt` | string | 生成日時（ISO 8601形式） |
 
 ---
@@ -736,6 +161,121 @@ node server.js
 ---
 
 ## トラブルシューティング
+
+### 🖼️ CRITICAL: 新規記事のサムネイル画像設定手順
+
+**すべての新規記事について、記事内容に合ったサムネイル画像を必ず設定すること:**
+
+**1. Web検索で記事に関連する画像を探す**
+
+```bash
+# WebSearchで記事のトピックに関連する公式記事・ブログを検索
+# 例: "GitHub Agent HQ unified AI coding environment 2025"
+```
+
+**2. 公式ソースから適切な画像URLを取得**
+
+```bash
+# WebFetchで公式記事のHTMLを取得し、ヒーロー画像・メイン画像のURLを抽出
+# 優先順位:
+# 1. 公式ブログのヒーロー画像
+# 2. プロダクトページのメイン画像
+# 3. GitHubリポジトリのOGP画像
+```
+
+**3. 画像をダウンロードして配置**
+
+```bash
+cd C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\web
+
+# curlで画像をダウンロード（記事スラッグ名-thumbnail.jpgの形式）
+curl -o [記事スラッグ]-thumbnail.jpg "[画像URL]"
+
+# 例:
+curl -o github-agent-hq-thumbnail.jpg "https://github.blog/wp-content/uploads/2025/10/UniverseBlogHeader_07.jpg"
+```
+
+**4. index.htmlのサムネイルパスを更新**
+
+```javascript
+// index.html の availableArticles 配列内で該当記事のサムネイルパスを更新
+{
+  slug: 'github-agent-hq-unified-ai-coding-2025',
+  title: 'GitHub Agent HQ統合AI開発環境2025',
+  thumbnail: 'audio-reader/web/github-agent-hq-thumbnail.jpg', // ← ここを更新
+  publishDate: '2025/11/09',
+  url: 'https://zenn.dev/dragonrondo/articles/github-agent-hq-unified-ai-coding-2025',
+  likes: 0
+}
+```
+
+**画像選定の基準:**
+- 記事内容を視覚的に表現している
+- 高解像度（最低1200x630px推奨）
+- 公式ソースからの引用（著作権問題を回避）
+- OGP画像として適切なアスペクト比
+
+**🚨 注意事項:**
+- **汎用的なai-agents-thumbnail.jpgは使用禁止** - 記事ごとに専用のサムネイルを設定すること
+- 著作権を確認（公式ブログ・プロダクトページからの引用を優先）
+- ファイル名は記事スラッグと対応させる（例: `[slug]-thumbnail.jpg`）
+
+### 🚨 CRITICAL: 新規記事の音声生成必須手順
+
+**すべての新規記事について、以下の3種類の音声を必ず生成すること:**
+
+1. **ja-male（男性音声）** - デフォルト音声
+2. **ja-female（女性音声）** - 女性ナレーション
+3. **ja-normal（標準音声）** - バックアップ用
+
+**生成手順:**
+
+```bash
+cd C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader
+
+# 1. ja-male（男性音声）を生成
+node scripts/generate_article_audio.js ../articles/[記事ファイル名].md ja-male
+
+# 2. ja-female（女性音声）を生成
+node scripts/generate_article_audio.js ../articles/[記事ファイル名].md ja-female
+
+# 3. ja-normal（標準音声）を生成
+node scripts/generate_article_audio.js ../articles/[記事ファイル名].md ja-normal
+```
+
+**生成確認:**
+
+```bash
+# 生成された音声ファイルを確認
+ls audio/[記事スラッグ]/
+
+# 期待される出力:
+# article_ja-male_chunk_01.mp3
+# article_ja-male_chunk_02.mp3
+# article_ja-female_chunk_01.mp3
+# article_ja-female_chunk_02.mp3
+# article_ja-normal_chunk_01.mp3
+# article_ja-normal_chunk_02.mp3
+# playlist.json
+```
+
+**重要な注意事項:**
+
+- 🚨 **3種類すべての音声を生成しないと、ユーザーが音声切り替え時に404エラーになる**
+- `index.html`のデフォルト音声設定は`ja-male`なので、必ず最初に生成すること
+- 音声生成には1種類あたり約20-30秒かかる（記事の長さによる）
+- Google Cloud TTSの認証情報（`service-account-key.json`）が必要
+
+**典型的なエラー:**
+
+```
+Failed to load resource: the server responded with a status of 404 ()
+zenn-ai-news/audio-reader/audio/[記事]/article_ja-male_chunk_01.mp3
+```
+
+このエラーが出た場合、該当する音声ファイルが生成されていないことを意味する。
+
+---
 
 ### Q1. gTTS音声生成が失敗する
 
@@ -1756,27 +1296,8 @@ google.api_core.exceptions.PermissionDenied: 403 Caller does not have required p
    ```
 
 2. ファイルが存在しない場合:
-   
-   **方法A（推奨）: 新規サービスアカウント作成**
-   1. GCP Console: https://console.cloud.google.com/iam-admin/serviceaccounts?project=yt-transcript-demo-2025
-   2. 「サービスアカウントを作成」をクリック
-   3. 名前: `zenn-audio-reader` / 説明: `Zenn記事音声生成専用`
-   4. 権限付与: `Cloud Text-to-Speech API ユーザー` のみ
-   5. キーを作成 → JSON形式でダウンロード
-   6. `audio-reader/service-account-key.json`に配置
-   
-   **方法B（緊急時のみ）: 既存ファイル流用**
-   
-   ⚠️ **セキュリティリスク**: この方法は最小権限の原則に反します
-   ```bash
-   # ホームディレクトリで検索
-   ls -la ~/ | grep service-account-key
-   
-   # 見つかった場合は一時的にコピー（本番環境では使用禁止）
-   cp "~/[既存ファイル]" audio-reader/service-account-key.json
-   ```
-   
-   🔒 **重要**: 方法Bを使用した場合、速やかに方法Aで専用アカウントを作成し、古いキーは無効化すること
+   - Google Cloud Consoleからサービスアカウントキーをダウンロード
+   - `audio-reader/service-account-key.json`に配置
 
 3. 権限確認:
    ```bash
@@ -2232,6 +1753,232 @@ sleep 60
 **ドキュメント化:**
 - [x] Playwright MCPトラブルシューティングをDESIGN_DOCUMENT.mdに記載
 - [ ] Claude Codeプロジェクト共通の「ブラウザ自動化ガイド」作成
+
+---
+
+### Q8. GitHub Pagesに新エピソードが表示されない
+
+**発生日**: 2025/11/09  
+**セッション**: feature/article-audio-reader-clean ブランチでの新エピソード追加
+
+#### 症状
+
+GitHub Pagesに新しいエピソードを追加したが、https://tenormusica2024.github.io/zenn-ai-news/ で表示されない。
+
+**実施した作業:**
+1. `feature/article-audio-reader-clean` ブランチに新エピソード音声ファイルを追加・コミット・プッシュ
+2. `audio-reader/web/audio-player.html` の `availableArticles` 配列に新エピソード情報を追加・コミット・プッシュ
+3. GitHub Pagesのビルドが完了するまで待機
+
+**問題:**
+上記作業後もGitHub Pagesに新エピソードが表示されない。
+
+#### 根本原因
+
+**誤ったファイルを編集していた。**
+
+- ❌ 編集したファイル: `audio-reader/web/audio-player.html`
+- ✅ 正しいファイル: **`index.html`** (リポジトリルート)
+
+**GitHub Pagesはリポジトリルートの `index.html` を公開**するため、サブディレクトリの `audio-player.html` を編集しても反映されない。
+
+#### ファイル構造の理解
+
+```
+zenn-ai-news/
+├── index.html                        ← GitHub Pagesが公開（正しいファイル）
+├── audio-reader/
+│   └── web/
+│       └── audio-player.html         ← これを編集しても反映されない
+└── audio/
+    └── github-agent-hq-unified-ai-coding-2025/
+        ├── article_ja-normal_chunk_01.mp3
+        ├── article_ja-normal_chunk_02.mp3
+        └── playlist.json
+```
+
+**GitHub Pagesの公開ルール:**
+1. リポジトリルートの `index.html` がエントリーポイント
+2. サブディレクトリの `.html` ファイルは直接URLでアクセス可能だが、自動的には公開されない
+3. JavaScript内で定義された `availableArticles` 配列は、**公開される `index.html` 内**に記述する必要がある
+
+#### 対処法
+
+**ステップ1: 正しいファイルを確認**
+```bash
+cd "C:\Users\Tenormusica\Documents\zenn-ai-news"
+
+# リポジトリルートに index.html が存在するか確認
+ls -la index.html
+
+# GitHub Pagesの公開対象を確認
+# （ブラウザでアクセスする実際のファイル）
+```
+
+**ステップ2: リポジトリルートの `index.html` を編集**
+```bash
+# ルートの index.html 内の availableArticles を確認
+grep -n "const availableArticles" index.html
+
+# 正しいファイルを編集して新エピソードを追加
+# （Read → Edit → Commit → Push）
+```
+
+**ステップ3: 変更をコミット・プッシュ**
+```bash
+git add index.html
+git commit -m "index.htmlに新エピソード追加（GitHub Pages公開用）"
+git push origin feature/article-audio-reader-clean
+```
+
+**ステップ4: GitHub Pagesビルド完了を待機**
+```bash
+# 1-2分待機後、キャッシュクリアして確認
+# Ctrl+Shift+R（強制リフレッシュ）
+```
+
+#### コード修正内容
+
+**変更ファイル:** `index.html` (リポジトリルート)
+
+**変更箇所:** Line 722 - `availableArticles` 配列
+
+**修正前:**
+```javascript
+const availableArticles = [
+  {
+    slug: 'affinity-3-free-canva-ai-strategy-2025',
+    title: 'Affinity無料化でCanvaのAI戦略が明らかに',
+    thumbnail: 'audio-reader/web/affinity-thumbnail.jpg',
+    publishDate: '2025/11/06',
+    url: 'https://zenn.dev/dragonrondo/articles/affinity-3-free-canva-ai-strategy-2025',
+    likes: 0
+  },
+  {
+    slug: 'ai-agents-70-percent-failure-reality-2025',
+    title: 'AIエージェントの70%が失敗する現実',
+    thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
+    publishDate: '2025/11/07',
+    url: 'https://zenn.dev/dragonrondo/articles/ai-agents-70-percent-failure-reality-2025',
+    likes: 0
+  }
+];
+```
+
+**修正後:**
+```javascript
+const availableArticles = [
+  {
+    slug: 'github-agent-hq-unified-ai-coding-2025',
+    title: 'GitHub Agent HQ統合AI開発環境2025',
+    thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
+    publishDate: '2025/11/09',
+    url: 'https://zenn.dev/dragonrondo/articles/github-agent-hq-unified-ai-coding-2025',
+    likes: 0
+  },
+  {
+    slug: 'ai-agents-70-percent-failure-reality-2025',
+    title: 'AIエージェントの70%が失敗する現実',
+    thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
+    publishDate: '2025/11/07',
+    url: 'https://zenn.dev/dragonrondo/articles/ai-agents-70-percent-failure-reality-2025',
+    likes: 0
+  },
+  {
+    slug: 'affinity-3-free-canva-ai-strategy-2025',
+    title: 'Affinity無料化でCanvaのAI戦略が明らかに',
+    thumbnail: 'audio-reader/web/affinity-thumbnail.jpg',
+    publishDate: '2025/11/06',
+    url: 'https://zenn.dev/dragonrondo/articles/affinity-3-free-canva-ai-strategy-2025',
+    likes: 0
+  }
+];
+```
+
+**変更内容:**
+1. 新エピソード `github-agent-hq-unified-ai-coding-2025` を配列の先頭に追加
+2. エピソードを日付順（新→旧）に並べ替え
+3. サムネイル画像は既存の `ai-agents-thumbnail.jpg` を一時的に使用
+
+#### コミット情報
+
+- **コミット1 (音声ファイル追加)**: `c7ff7ea`
+- **コミット2 (audio-player.html更新・誤り)**: `a12dbdc`
+- **コミット3 (index.html更新・正解)**: `d061628`
+- **ブランチ**: `feature/article-audio-reader-clean`
+
+#### 教訓と今後の対策
+
+**今回の失敗の本質:**
+
+1. **ファイル構造の理解不足**
+   - GitHub Pagesの公開構造を確認せずに作業を開始
+   - `index.html` と `audio-player.html` の役割を混同
+
+2. **動作検証の欠如**
+   - 変更後に実際のGitHub Pages URLで確認しなかった
+   - 「コミット・プッシュ = 完了」という誤った認識
+
+3. **FALSE SUCCESS CLAIMS（虚偽の成功報告）**
+   - 間違ったファイルを編集したのに「完了」と報告
+   - 実際の動作確認を怠ったまま成功を宣言
+
+**今後の必須プロトコル:**
+
+1. **デプロイ前の構造確認**
+   ```bash
+   # 公開対象ファイルを必ず確認
+   ls -la index.html
+   # GitHub Pages設定を確認（Settings > Pages）
+   ```
+
+2. **デプロイ後の必須動作確認**
+   ```bash
+   # 1-2分待機後、実際のURLで確認
+   curl -s https://tenormusica2024.github.io/zenn-ai-news/ | grep "github-agent-hq"
+   # または
+   # ブラウザでCtrl+Shift+R（キャッシュクリア）して目視確認
+   ```
+
+3. **FALSE SUCCESS CLAIMSの完全禁止**
+   - 実際の公開URLで動作確認するまで「完了」と報告しない
+   - 「技術的実装完了」≠「ユーザーに見える状態」を常に意識
+   - 確認できない場合は正直に「未確認」と報告
+
+**ベストプラクティス:**
+
+```bash
+# 新エピソード追加の正しいワークフロー
+
+# 1. ファイル構造確認
+ls -la index.html audio-reader/web/audio-player.html
+
+# 2. GitHub Pagesの公開設定確認（どのファイルが公開されているか）
+# GitHub Settings > Pages > Source > Branch & Path
+
+# 3. 正しいファイル（index.html）を編集
+# Read → Edit → Commit → Push
+
+# 4. GitHub Pagesビルド待機（1-2分）
+
+# 5. 動作確認（必須）
+curl -s https://tenormusica2024.github.io/zenn-ai-news/ | grep "新エピソード名"
+
+# 6. ブラウザで目視確認（Ctrl+Shift+Rでキャッシュクリア）
+
+# 7. 動作確認完了後に初めて「完了」報告
+```
+
+#### 参考情報
+
+**GitHub Pagesの基本:**
+- [GitHub Pages Documentation](https://docs.github.com/en/pages)
+- デフォルトの公開ファイル: `index.html`, `README.md`
+- ブランチ単位で公開設定が可能（Settings > Pages > Source）
+
+**関連トラブルシューティング:**
+- Q1-Q7: 音声生成・再生関連の問題
+- Q8（本項目）: GitHub Pages公開構造の理解
 
 ---
 
