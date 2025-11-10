@@ -59,51 +59,40 @@
 - Google Cloud TTS認証キーが設定済み
 - Node.js環境が整っている
 
-### ステップ1: 記事ファイル作成（masterブランチ）
+### ステップ1: 作業ブランチの準備と記事ファイル作成
+
+**🔍 ブランチ戦略の簡素化**: 以前はmasterブランチで記事作成→feature/article-audio-reader-cleanに移動という複雑な手順でしたが、**すべての作業をfeature/article-audio-reader-cleanブランチで完結**させることで初心者にも分かりやすくなります。
 
 ```bash
-# 1. masterブランチに切り替え
-git checkout master
-git pull origin master
-
-# 2. articles/ディレクトリに記事を作成
-# ファイル名: [スラッグ].md
-# 例: chatgpt-vulnerabilities-hackedgpt-2025.md
-
-# 3. 記事をコミット・プッシュ
-git add articles/[スラッグ].md
-git commit -m "[記事タイトル]を追加"
-git push origin master
-```
-
-### ステップ2: feature/article-audio-reader-cleanブランチに切り替え
-
-```bash
-# 1. 本番ブランチに切り替え
+# 1. 作業ブランチに切り替え（すでにいる場合はスキップ）
 git checkout feature/article-audio-reader-clean
 git pull origin feature/article-audio-reader-clean
 
 # 2. 現在のブランチを確認
 git branch
 # → * feature/article-audio-reader-clean が表示されることを確認
+
+# 3. articles/ディレクトリに記事を作成
+# ファイル名: [スラッグ].md
+# 例: chatgpt-vulnerabilities-hackedgpt-2025.md
+# この時点ではコミット・プッシュしない（音声・サムネイルと一緒にコミット）
 ```
 
-### ステップ3: masterブランチから記事ファイルを取得
+**📝 なぜこの方法が優れているのか:**
+- ❌ **旧方式**: masterで作成→コミット→feature/article-audio-reader-cleanに切り替え→git checkout master --で取得（複雑）
+- ✅ **新方式**: feature/article-audio-reader-cleanで作成→音声・サムネイル追加→まとめてコミット（シンプル）
+- ✅ ブランチ間の移動が不要
+- ✅ Git初心者でも理解しやすい
+- ✅ コミット履歴が整理される（1記事=1コミット）
 
-```bash
-# masterブランチから記事ファイルのみを取得
-git checkout master -- articles/[スラッグ].md
-
-# 取得確認
-ls -la articles/[スラッグ].md
-```
-
-**🔍 重要**: この操作により、masterブランチの記事ファイルがfeature/article-audio-reader-cleanブランチに追加されます。他のブランチの変更は持ち込まれません。
-
-### ステップ4: サムネイル画像取得
+### ステップ2: サムネイル画像取得
 
 **🚨 CRITICAL: ウェブ上から記事に最適な画像を取得する**
 
+**🔧 自動化スクリプト（今後の改善予定）:**
+現在は手動実行ですが、`scripts/fetch_thumbnail.js`のような自動化スクリプトを作成予定です。
+
+**現在の手動実行手順:**
 ```bash
 # 1. WebSearchで画像検索（Claude Code実行）
 # 例: "ChatGPT vulnerability HackedGPT security image thumbnail 2025"
@@ -118,7 +107,17 @@ curl -o [スラッグ]-thumbnail.jpg "[画像URL]"
 # 4. 画像確認（Claude Code: Read ツール実行）
 # 視覚的に内容を確認し、記事に適しているか判定
 
+# 5. 画像サイズ確認（推奨: 50KB-200KB）
+ls -lh [スラッグ]-thumbnail.jpg
+
 cd ../..
+```
+
+**🎯 将来的な自動化スクリプト案:**
+```javascript
+// scripts/fetch_thumbnail.js（今後実装予定）
+// 使用方法: node scripts/fetch_thumbnail.js "記事タイトル" "記事スラッグ"
+// 自動でWebSearch → WebFetch → ダウンロード → 最適化を実行
 ```
 
 **絶対禁止事項:**
@@ -132,10 +131,29 @@ cd ../..
 - ✅ 公式ブログの画像
 - ✅ 著作権的に問題のないニュース画像
 
-### ステップ5: 音声生成（両方の音声）
+### ステップ4: 音声生成（両方の音声）
 
 **🚨 CRITICAL: 必ずaudio-readerディレクトリで実行**
 
+**🔍 なぜaudio-readerディレクトリで実行する必要があるのか:**
+
+1. **package.jsonの配置場所**: `audio-reader/package.json`に依存パッケージが定義されており、`node_modules`もaudio-reader配下にある
+2. **相対パスの設計**: `generate_article_audio.js`は相対パス`../articles/[スラッグ].md`で記事ファイルを参照する設計
+3. **Google Cloud認証キー**: `service-account-key.json`がaudio-reader直下に配置されており、スクリプトはこの場所を前提としている
+4. **出力先ディレクトリ**: 音声ファイルの出力先`audio/`がaudio-reader配下に存在
+
+**❌ zenn-ai-newsディレクトリから実行した場合:**
+```bash
+# 誤った実行例
+cd C:\Users\Tenormusica\Documents\zenn-ai-news
+node audio-reader/scripts/generate_article_audio.js articles/[スラッグ].md ja-male
+
+# エラー内容:
+# Error: Cannot find module '@google-cloud/text-to-speech'
+# → node_modulesがaudio-reader配下にあるため見つからない
+```
+
+**✅ 正しい実行手順:**
 ```bash
 # 1. audio-readerディレクトリに移動
 cd audio-reader
@@ -157,17 +175,29 @@ ls -la audio/[スラッグ]/
 cd ..
 ```
 
-**🔍 音声生成失敗時の対処法:**
+**🔍 音声生成失敗時の詳細対処法:**
 ```bash
-# エラー: Cannot find module
-# → audio-readerディレクトリで実行しているか確認
+# エラー1: Cannot find module '@google-cloud/text-to-speech'
+# 原因: audio-readerディレクトリで実行していない
+# 対処: cd audio-reader で移動してから再実行
 
-# エラー: Google Cloud認証エラー
-# → service-account-key.jsonが正しく配置されているか確認
-ls audio-reader/service-account-key.json
+# エラー2: Google Cloud認証エラー "Could not load the default credentials"
+# 原因: service-account-key.jsonが存在しない、または配置場所が違う
+# 対処: 以下のコマンドで確認
+ls -la audio-reader/service-account-key.json
+# → ファイルが存在しない場合は、Google Cloud Consoleから再ダウンロード
+
+# エラー3: ENOENT: no such file or directory, open '../articles/[スラッグ].md'
+# 原因: 記事ファイルが存在しない、またはパスが間違っている
+# 対処: 記事ファイルの存在確認
+ls -la ../articles/[スラッグ].md
+
+# エラー4: Quota exceeded for quota metric 'CharacterCount'
+# 原因: Google Cloud TTSの無料枠を超過した
+# 対処: Google Cloud Consoleで課金設定を確認、または翌月まで待機
 ```
 
-### ステップ6: index.html更新
+### ステップ5: index.html更新
 
 **🚨 CRITICAL: availableArticles配列の先頭に追加**
 
@@ -202,7 +232,7 @@ const availableArticles = [
 - `url`: Zenn記事のURL（`https://zenn.dev/dragonrondo/articles/[スラッグ]`）
 - `likes`: 初期値は`0`
 
-### ステップ7: Git管理確認（必須チェックリスト）
+### ステップ6: Git管理確認（必須チェックリスト）
 
 **🚨 CRITICAL: 以下の全ファイルがGit管理下にあることを確認**
 
@@ -233,9 +263,20 @@ git add audio-reader/web/[スラッグ]-thumbnail.jpg
 git add index.html
 ```
 
-### ステップ8: ローカル確認（オプションだが強く推奨）
+### ステップ7: ローカル確認（必須）
 
-**🚨 CRITICAL: GitHub Pagesにプッシュする前にローカルで確認**
+**🚨 CRITICAL: GitHub Pagesにプッシュする前に必ずローカルで確認**
+
+**❌ ローカル確認をスキップした場合のリスク:**
+- GitHub Pagesにプッシュ後に404エラー発見
+- 音声ファイルが再生されないエラー発見
+- サムネイル画像が表示されないエラー発見
+- **結果**: 修正→再プッシュ→1-2分待機→確認の無駄なサイクル（合計5-10分のロス）
+
+**✅ ローカル確認を実施した場合:**
+- プッシュ前にエラーを発見・修正（30秒-1分で完了）
+- 本番環境への影響なし
+- **結果**: 確実な1回のプッシュで完了
 
 ```bash
 # 1. 開発サーバー起動
@@ -260,7 +301,7 @@ node server.js
 cd ..
 ```
 
-### ステップ9: Git操作
+### ステップ8: Git操作
 
 ```bash
 # 1. 変更をステージング
@@ -278,7 +319,7 @@ git commit -m "[記事タイトル]の音声・サムネイル追加
 git push origin feature/article-audio-reader-clean
 ```
 
-### ステップ10: デプロイ確認
+### ステップ9: デプロイ確認
 
 **🚨 CRITICAL: 1-2分待機後にGitHub Pagesで確認**
 
@@ -306,37 +347,94 @@ curl -I https://tenormusica2024.github.io/zenn-ai-news/audio-reader/audio/[ス�
 4. サムネイル画像が表示されているか確認
 5. 記事をクリックして音声が再生されるか確認
 
-### 🔍 トラブルシューティング
+### 🔍 トラブルシューティング（拡充版）
 
-**問題1: 記事ファイルがfeature/article-audio-reader-cleanブランチに存在しない**
+**問題1: 音声生成エラー「Cannot find module '@google-cloud/text-to-speech'」**
 ```bash
-# 原因: git checkout master -- articles/[スラッグ].md を実行していない
-# 対処: ステップ3を再実行
-git checkout master -- articles/[スラッグ].md
-```
-
-**問題2: 音声生成エラー「Cannot find module」**
-```bash
-# 原因: zenn-ai-newsディレクトリで実行している
+# 原因: zenn-ai-newsディレクトリから実行している
 # 対処: audio-readerディレクトリで実行
 cd audio-reader
 node scripts/generate_article_audio.js ../articles/[スラッグ].md ja-male
+
+# または、依存パッケージが未インストール
+# 対処: audio-readerディレクトリでnpm install実行
+cd audio-reader
+npm install
 ```
 
-**問題3: GitHub Pagesで404エラー**
+**問題2: Google Cloud TTS認証エラー**
+```bash
+# エラーメッセージ: "Could not load the default credentials"
+# 原因1: service-account-key.jsonが存在しない
+# 対処: ファイル存在確認
+ls -la audio-reader/service-account-key.json
+
+# 原因2: 認証キーのパーミッションエラー（Linux/Mac）
+# 対処: パーミッション修正
+chmod 600 audio-reader/service-account-key.json
+
+# 原因3: 認証キーの内容が不正
+# 対処: Google Cloud Consoleから再ダウンロード
+# https://console.cloud.google.com/iam-admin/serviceaccounts
+```
+
+**問題3: 音声ファイルサイズが大きすぎる（GitHub 100MB制限）**
+```bash
+# 症状: git push時に "file exceeds 100 MB" エラー
+# 原因: 長文記事の音声ファイルが100MBを超えている
+
+# 対処方法1: チャンク分割設定を調整
+# scripts/generate_article_audio.js内のMAX_CHUNK_SIZEを小さくする
+# 例: 5000 → 3000 バイト
+
+# 対処方法2: MP3のビットレートを下げる（音質低下あり）
+# generate_tts_audio.py内のaudioEncodingを調整
+```
+
+**問題4: playlist.json生成エラー**
+```bash
+# 症状: 音声ファイルは生成されるがplaylist.jsonが作成されない
+# 原因: スクリプト実行途中でエラー発生
+
+# 対処: 詳細ログを確認
+cd audio-reader
+node scripts/generate_article_audio.js ../articles/[スラッグ].md ja-male --verbose
+
+# 原因がわかったら該当エラーを修正後、再実行
+```
+
+**問題5: GitHub Pagesで404エラー**
 ```bash
 # 原因: ファイルがGit管理下にない
-# 対処: ステップ7のチェックリストを再確認
+# 対処: ステップ6のチェックリストを再確認
 git ls-files | grep [スラッグ]
 # → 全ファイルが表示されない場合は git add で追加
 ```
 
-**問題4: サムネイル画像が表示されない**
+**問題6: サムネイル画像が表示されない**
 ```bash
 # 原因: パスが間違っている
 # 対処: index.html内のパスを確認
 # ✅ 正しい: audio-reader/web/[スラッグ]-thumbnail.jpg
 # ❌ 間違い: /web/[スラッグ]-thumbnail.jpg
+
+# または、画像ファイルがGit管理下にない
+git ls-files audio-reader/web/[スラッグ]-thumbnail.jpg
+```
+
+**問題7: チャンク分割が正しく動作しない**
+```bash
+# 症状: 音声が途中で途切れる、または再生されない
+# 原因: Markdown解析エラー、またはチャンク分割ロジックの問題
+
+# 対処: 記事の構造を確認
+# - Markdown frontmatterが正しく記載されているか
+# - 特殊文字（絵文字、記号）が含まれていないか
+# - コードブロックが正しく閉じられているか
+
+# デバッグモードで実行
+cd audio-reader
+node scripts/generate_article_audio.js ../articles/[スラッグ].md ja-male --debug
 ```
 
 ---
