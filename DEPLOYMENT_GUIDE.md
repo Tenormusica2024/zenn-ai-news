@@ -1,7 +1,7 @@
 # 🚀 Zenn Article Audio Reader - GitHub Pages デプロイガイド
 
 > **作成日**: 2025/11/09  
-> **最終更新**: 2025/11/09  
+> **最終更新**: 2025/11/10  
 > **ステータス**: ✅ 本番稼働中
 
 ---
@@ -9,10 +9,11 @@
 ## 📋 目次
 
 1. [プロジェクト概要](#プロジェクト概要)
-2. [GitHub Pages デプロイ完全ガイド](#github-pages-デプロイ完全ガイド)
-3. [ディレクトリ構造とパス設計](#ディレクトリ構造とパス設計)
-4. [トラブルシューティング完全版](#トラブルシューティング完全版)
-5. [開発履歴とナレッジベース](#開発履歴とナレッジベース)
+2. [新規記事追加の完全ワークフロー](#新規記事追加の完全ワークフロー) ← **最重要**
+3. [GitHub Pages デプロイ完全ガイド](#github-pages-デプロイ完全ガイド)
+4. [ディレクトリ構造とパス設計](#ディレクトリ構造とパス設計)
+5. [トラブルシューティング完全版](#トラブルシューティング完全版)
+6. [開発履歴とナレッジベース](#開発履歴とナレッジベース)
 
 ---
 
@@ -46,6 +47,300 @@
 
 ---
 
+## 🆕 新規記事追加の完全ワークフロー
+
+**🚨 CRITICAL: このセクションは新規記事追加時に必ず参照してください**
+
+このワークフローに従うことで、ブランチ間のファイル移動、音声生成、サムネイル取得、Git管理の全ステップを網羅できます。
+
+### 前提条件
+
+- masterブランチで記事（Markdown）を作成済み
+- Google Cloud TTS認証キーが設定済み
+- Node.js環境が整っている
+
+### ステップ1: 記事ファイル作成（masterブランチ）
+
+```bash
+# 1. masterブランチに切り替え
+git checkout master
+git pull origin master
+
+# 2. articles/ディレクトリに記事を作成
+# ファイル名: [スラッグ].md
+# 例: chatgpt-vulnerabilities-hackedgpt-2025.md
+
+# 3. 記事をコミット・プッシュ
+git add articles/[スラッグ].md
+git commit -m "[記事タイトル]を追加"
+git push origin master
+```
+
+### ステップ2: feature/article-audio-reader-cleanブランチに切り替え
+
+```bash
+# 1. 本番ブランチに切り替え
+git checkout feature/article-audio-reader-clean
+git pull origin feature/article-audio-reader-clean
+
+# 2. 現在のブランチを確認
+git branch
+# → * feature/article-audio-reader-clean が表示されることを確認
+```
+
+### ステップ3: masterブランチから記事ファイルを取得
+
+```bash
+# masterブランチから記事ファイルのみを取得
+git checkout master -- articles/[スラッグ].md
+
+# 取得確認
+ls -la articles/[スラッグ].md
+```
+
+**🔍 重要**: この操作により、masterブランチの記事ファイルがfeature/article-audio-reader-cleanブランチに追加されます。他のブランチの変更は持ち込まれません。
+
+### ステップ4: サムネイル画像取得
+
+**🚨 CRITICAL: ウェブ上から記事に最適な画像を取得する**
+
+```bash
+# 1. WebSearchで画像検索（Claude Code実行）
+# 例: "ChatGPT vulnerability HackedGPT security image thumbnail 2025"
+
+# 2. WebFetchで画像URL抽出（Claude Code実行）
+# The Hacker News等のセキュリティメディアから抽出
+
+# 3. 画像ダウンロード
+cd audio-reader/web
+curl -o [スラッグ]-thumbnail.jpg "[画像URL]"
+
+# 4. 画像確認（Claude Code: Read ツール実行）
+# 視覚的に内容を確認し、記事に適しているか判定
+
+cd ../..
+```
+
+**絶対禁止事項:**
+- ❌ SVGで画像を作成する
+- ❌ Pythonで画像を生成する
+- ❌ ローカルで画像を作成する
+
+**推奨される画像ソース:**
+- ✅ The Hacker News記事の画像
+- ✅ セキュリティメディアの記事画像
+- ✅ 公式ブログの画像
+- ✅ 著作権的に問題のないニュース画像
+
+### ステップ5: 音声生成（両方の音声）
+
+**🚨 CRITICAL: 必ずaudio-readerディレクトリで実行**
+
+```bash
+# 1. audio-readerディレクトリに移動
+cd audio-reader
+
+# 2. 男性音声生成
+node scripts/generate_article_audio.js ../articles/[スラッグ].md ja-male
+
+# 3. 女性音声生成
+node scripts/generate_article_audio.js ../articles/[スラッグ].md ja-female
+
+# 4. 生成確認
+ls -la audio/[スラッグ]/
+# → 以下のファイルが存在することを確認:
+#    article_ja-male_chunk_01.mp3, article_ja-male_chunk_02.mp3, ...
+#    article_ja-female_chunk_01.mp3, article_ja-female_chunk_02.mp3, ...
+#    playlist.json
+
+# 5. プロジェクトルートに戻る
+cd ..
+```
+
+**🔍 音声生成失敗時の対処法:**
+```bash
+# エラー: Cannot find module
+# → audio-readerディレクトリで実行しているか確認
+
+# エラー: Google Cloud認証エラー
+# → service-account-key.jsonが正しく配置されているか確認
+ls audio-reader/service-account-key.json
+```
+
+### ステップ6: index.html更新
+
+**🚨 CRITICAL: availableArticles配列の先頭に追加**
+
+```javascript
+// index.html内のavailableArticles配列を編集
+
+const availableArticles = [
+  // ✅ 新規記事は配列の先頭（0番目）に追加
+  {
+    slug: '[スラッグ]',  // ← 記事ファイル名から.mdを除去
+    title: '[記事タイトル]',  // ← 記事の正式タイトル
+    thumbnail: 'audio-reader/web/[スラッグ]-thumbnail.jpg',  // ← サムネイル画像パス
+    publishDate: 'YYYY/MM/DD',  // ← 公開日（例: 2025/11/10）
+    url: 'https://zenn.dev/dragonrondo/articles/[スラッグ]',  // ← Zenn記事URL
+    likes: 0  // ← 初期値は0
+  },
+  // 既存の記事（そのまま残す）
+  {
+    slug: 'affinity-3-free-canva-ai-strategy-2025',
+    title: 'Affinity無料化でCanvaとの競争激化...',
+    // ...
+  },
+  // ...
+];
+```
+
+**📝 フィールド説明:**
+- `slug`: 記事ファイル名から`.md`を除去したもの
+- `title`: 記事のタイトル（Markdown frontmatterの`title`と同じ）
+- `thumbnail`: サムネイル画像のパス（必ず`audio-reader/web/`から始める）
+- `publishDate`: 記事の公開日（YYYY/MM/DD形式）
+- `url`: Zenn記事のURL（`https://zenn.dev/dragonrondo/articles/[スラッグ]`）
+- `likes`: 初期値は`0`
+
+### ステップ7: Git管理確認（必須チェックリスト）
+
+**🚨 CRITICAL: 以下の全ファイルがGit管理下にあることを確認**
+
+```bash
+# ✅ 記事ファイル確認
+git ls-files articles/[スラッグ].md
+# → articles/[スラッグ].md が表示されることを確認
+
+# ✅ 音声ファイル確認
+git ls-files audio-reader/audio/[スラッグ]/
+# → 全ての.mp3ファイルとplaylist.jsonが表示されることを確認
+
+# ✅ サムネイル画像確認
+git ls-files audio-reader/web/[スラッグ]-thumbnail.jpg
+# → audio-reader/web/[スラッグ]-thumbnail.jpg が表示されることを確認
+
+# ✅ index.html更新確認
+git diff index.html
+# → availableArticles配列に新規記事が追加されていることを確認
+```
+
+**⚠️ ファイルが表示されない場合:**
+```bash
+# ファイルが表示されない場合は手動で追加
+git add articles/[スラッグ].md
+git add audio-reader/audio/[スラッグ]/
+git add audio-reader/web/[スラッグ]-thumbnail.jpg
+git add index.html
+```
+
+### ステップ8: ローカル確認（オプションだが強く推奨）
+
+**🚨 CRITICAL: GitHub Pagesにプッシュする前にローカルで確認**
+
+```bash
+# 1. 開発サーバー起動
+cd audio-reader
+node server.js
+# → Server running at http://localhost:8081/
+
+# 2. ブラウザで確認
+# http://localhost:8081/ にアクセス
+
+# 3. 確認項目:
+#    - 新規記事が一覧の先頭に表示されているか
+#    - サムネイル画像が正しく表示されているか
+#    - 音声（男性/女性）が正常に再生されるか
+#    - 再生速度調整が機能するか
+#    - シーク操作が機能するか
+
+# 4. 確認完了後、サーバーを停止
+# Ctrl+C でサーバー停止
+
+# 5. プロジェクトルートに戻る
+cd ..
+```
+
+### ステップ9: Git操作
+
+```bash
+# 1. 変更をステージング
+git add .
+
+# 2. コミット（詳細なメッセージ）
+git commit -m "[記事タイトル]の音声・サムネイル追加
+
+- 記事ファイル: articles/[スラッグ].md
+- 音声ファイル: audio-reader/audio/[スラッグ]/ (ja-male, ja-female)
+- サムネイル画像: audio-reader/web/[スラッグ]-thumbnail.jpg
+- index.html: availableArticles配列に追加"
+
+# 3. プッシュ
+git push origin feature/article-audio-reader-clean
+```
+
+### ステップ10: デプロイ確認
+
+**🚨 CRITICAL: 1-2分待機後にGitHub Pagesで確認**
+
+```bash
+# 1. 1-2分待機（GitHub Pages自動デプロイ完了を待つ）
+sleep 120
+
+# 2. HTTPステータス確認
+curl -I https://tenormusica2024.github.io/zenn-ai-news/
+# → HTTP/2 200 が表示されることを確認
+
+# 3. サムネイル画像確認
+curl -I https://tenormusica2024.github.io/zenn-ai-news/audio-reader/web/[スラッグ]-thumbnail.jpg
+# → HTTP/2 200 が表示されることを確認
+
+# 4. 音声ファイル確認
+curl -I https://tenormusica2024.github.io/zenn-ai-news/audio-reader/audio/[スラッグ]/article_ja-male_chunk_01.mp3
+# → HTTP/2 200 が表示されることを確認
+```
+
+**🌐 ブラウザで最終確認:**
+1. https://tenormusica2024.github.io/zenn-ai-news/ にアクセス
+2. Ctrl+Shift+R で強制リフレッシュ（キャッシュクリア）
+3. 新規記事が一覧の先頭に表示されているか確認
+4. サムネイル画像が表示されているか確認
+5. 記事をクリックして音声が再生されるか確認
+
+### 🔍 トラブルシューティング
+
+**問題1: 記事ファイルがfeature/article-audio-reader-cleanブランチに存在しない**
+```bash
+# 原因: git checkout master -- articles/[スラッグ].md を実行していない
+# 対処: ステップ3を再実行
+git checkout master -- articles/[スラッグ].md
+```
+
+**問題2: 音声生成エラー「Cannot find module」**
+```bash
+# 原因: zenn-ai-newsディレクトリで実行している
+# 対処: audio-readerディレクトリで実行
+cd audio-reader
+node scripts/generate_article_audio.js ../articles/[スラッグ].md ja-male
+```
+
+**問題3: GitHub Pagesで404エラー**
+```bash
+# 原因: ファイルがGit管理下にない
+# 対処: ステップ7のチェックリストを再確認
+git ls-files | grep [スラッグ]
+# → 全ファイルが表示されない場合は git add で追加
+```
+
+**問題4: サムネイル画像が表示されない**
+```bash
+# 原因: パスが間違っている
+# 対処: index.html内のパスを確認
+# ✅ 正しい: audio-reader/web/[スラッグ]-thumbnail.jpg
+# ❌ 間違い: /web/[スラッグ]-thumbnail.jpg
+```
+
+---
+
 ## 🚀 GitHub Pages デプロイ完全ガイド
 
 ### 1. ブランチ戦略
@@ -65,6 +360,31 @@ master (main)
 - **クリーンな履歴**: 大容量ファイル・機密情報を含まない
 - **安定性**: テスト済みの安定したコード
 - **分離**: 開発作業と本番環境の分離
+
+#### ブランチ間のワークフロー
+
+**🔍 なぜ2つのブランチを使うのか?**
+
+1. **masterブランチ**: 記事（Markdown）の保管・管理
+   - Zenn記事のソースファイルを管理
+   - 記事の履歴・バージョン管理
+   - 記事の下書き・レビュー
+
+2. **feature/article-audio-reader-cleanブランチ**: 本番公開用
+   - 音声ファイル・サムネイル画像を含む
+   - GitHub Pagesで公開される
+   - index.htmlで記事一覧を管理
+
+**🔧 ブランチ間のファイル移動:**
+```bash
+# masterブランチから特定ファイルのみを取得
+git checkout master -- articles/[スラッグ].md
+
+# ✅ この操作のメリット:
+# - masterブランチの変更を持ち込まない
+# - 必要なファイルだけを取得できる
+# - ブランチをマージせずに済む
+```
 
 ### 2. GitHub Pages 設定手順
 
