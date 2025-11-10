@@ -3,7 +3,7 @@ title: "テスト記事 - Git Hook自動発火確認"
 emoji: "🧪"
 type: "tech"
 topics: ["test"]
-published: false
+published: true
 ---
 
 ## テスト記事
