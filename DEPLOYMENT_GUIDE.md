@@ -82,6 +82,33 @@
 - **ホスティング**: GitHub Pages (静的サイト)
 - **開発サーバー**: Node.js HTTP Server (Range Requests対応)
 
+### Google Cloud TTS 認証情報
+
+**🚨 CRITICAL: サービスアカウントキー情報（2025-11-11更新）**
+
+**現在のサービスアカウント:**
+- **プロジェクトID**: `yt-transcript-demo-2025`
+- **サービスアカウントEmail**: `firebase-adminsdk-fbsvc@yt-transcript-demo-2025.iam.gserviceaccount.com`
+- **キーファイルパス**: `audio-reader/service-account-key.json`
+- **キーID**: `4f4706ea8311bb6f767dcea47479a21a145c2b0f`
+
+**以前のサービスアカウント（非推奨）:**
+- **サービスアカウントEmail**: `zenn-audio-tts@yt-transcript-demo-2025.iam.gserviceaccount.com`
+- **状態**: 新しいキーに移行済み
+
+**新しいサービスアカウントキー作成方法:**
+```bash
+# 既存のサービスアカウントに新しいキーを作成
+gcloud iam service-accounts keys create "C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json" \
+  --iam-account=firebase-adminsdk-fbsvc@yt-transcript-demo-2025.iam.gserviceaccount.com \
+  --project=yt-transcript-demo-2025
+```
+
+**重要な注意事項:**
+- サービスアカウントキーファイルは `.gitignore` に必ず含める
+- 既にコミット済みの場合は `git filter-branch` で履歴から削除が必要（詳細はトラブルシューティング参照）
+- Google Cloud Console: https://console.cloud.google.com/iam-admin/serviceaccounts
+
 ### 主要機能
 
 1. **複数記事管理**: プレイリスト形式で複数記事を管理
@@ -439,7 +466,28 @@ curl -I https://tenormusica2024.github.io/zenn-ai-news/audio-reader/audio/[ス�
 
 **🔥 頻発エラー（過去10回のデプロイで5回以上発生と推定）:**
 
-**問題1: 音声生成エラー「Cannot find module '@google-cloud/text-to-speech'」**
+**問題1: Google Cloud TTS認証エラー (403 Permission Denied)**
+- **発生頻度**: 推定30%（10回中3回）
+- **主な原因**: サービスアカウントキーファイルが存在しない、または正しく設定されていない
+- **対処時間**: 平均5分
+```bash
+# エラーメッセージ例:
+# google.api_core.exceptions.PermissionDenied: 403 Caller does not have required permission to use project yt-transcript-demo-2025
+
+# 原因: service-account-key.jsonが存在しない、またはパスが間違っている
+# 対処: ファイル存在確認
+ls -la audio-reader/service-account-key.json
+
+# ファイルが存在しない場合、新しいキーを作成
+gcloud iam service-accounts keys create "audio-reader/service-account-key.json" \
+  --iam-account=firebase-adminsdk-fbsvc@yt-transcript-demo-2025.iam.gserviceaccount.com \
+  --project=yt-transcript-demo-2025
+
+# 環境変数で明示的にキーファイルを指定（必要な場合）
+export GOOGLE_APPLICATION_CREDENTIALS="C:\Users\Tenormusica\Documents\zenn-ai-news\audio-reader\service-account-key.json"
+```
+
+**問題1-A: 音声生成エラー「Cannot find module '@google-cloud/text-to-speech'」**
 - **発生頻度**: 推定70%（10回中7回）
   - **記録方法**: 次回10回のデプロイで、実際の発生回数を記録→ 発生率を更新
 - **主な原因**: zenn-ai-newsディレクトリから実行
@@ -459,29 +507,112 @@ npm install
 
 **⚠️ 時々発生するエラー（過去10回のデプロイで2-4回発生と推定）:**
 
-**問題2: Google Cloud TTS認証エラー**
-- **発生頻度**: 推定30%（10回中3回）
-- **主な原因**: service-account-key.jsonのパーミッション問題
-- **対処時間**: 平均5分
+**問題2: Gitマージコンフリクト**
+- **発生頻度**: 推定20%（10回中2回）
+- **主な原因**: 複数ブランチで同じファイルを編集
+- **対処時間**: 平均10分
 ```bash
-# エラーメッセージ: "Could not load the default credentials"
-# 原因1: service-account-key.jsonが存在しない
-# 対処: ファイル存在確認
-ls -la audio-reader/service-account-key.json
+# 症状例:
+# CONFLICT (content): Merge conflict in index.html
+# CONFLICT (add/add): Merge conflict in articles/[スラッグ].md
 
-# 原因2: 認証キーのパーミッションエラー（Linux/Mac）
-# 対処: パーミッション修正
-chmod 600 audio-reader/service-account-key.json
+# 原因: index.htmlのavailableArticles配列で、両ブランチが異なる記事を追加
+# 対処方法1: 両方の記事を保持し、日付順（新しい順）に並べる
 
-# 原因3: 認証キーの内容が不正
-# 対処: Google Cloud Consoleから再ダウンロード
-# https://console.cloud.google.com/iam-admin/serviceaccounts
+# コンフリクトマーカーを手動で編集（index.html）
+# <<<<<<< HEAD
+# {
+#   slug: 'article-2',
+#   title: '記事2',
+#   publishDate: '2025/11/10',
+#   // ...
+# },
+# =======
+# {
+#   slug: 'article-1',
+#   title: '記事1',
+#   publishDate: '2025/11/11',
+#   // ...
+# },
+# >>>>>>> feature/branch
+
+# 解決後のコード（日付順に並べる）
+const availableArticles = [
+  {
+    slug: 'article-1',
+    title: '記事1',
+    publishDate: '2025/11/11',  // 新しい順
+    // ...
+  },
+  {
+    slug: 'article-2',
+    title: '記事2',
+    publishDate: '2025/11/10',
+    // ...
+  },
+  // ...
+];
+
+# ADD/ADD コンフリクトの解決
+git add articles/[スラッグ].md
+git commit -m "マージコンフリクト解決: 両記事を保持"
+```
+
+**問題2-A: GitHub Push Protection - シークレット検出**
+- **発生頻度**: 推定5%（10回中0.5回）
+- **主な原因**: service-account-key.jsonがGit履歴に含まれている
+- **対処時間**: 平均3分
+```bash
+# エラーメッセージ例:
+# remote: error: GH013: Repository rule violations found
+# remote: - GITHUB PUSH PROTECTION
+# remote:   Push cannot contain secrets
+# remote:   —— Google Cloud Service Account Credentials ——————————
+
+# 原因: service-account-key.jsonがGitにコミットされている
+# .gitignoreに記載されていても、既にコミット済みのファイルは除外されない
+
+# 対処方法: Git履歴から完全に削除
+
+# 1. コミットを取り消してファイルをステージングから除外
+git reset --soft HEAD~1
+git restore --staged audio-reader/service-account-key.json
+
+# 2. Git履歴全体からファイルを削除
+git filter-branch --force --index-filter \
+  "git rm --cached --ignore-unmatch audio-reader/service-account-key.json" \
+  --prune-empty --tag-name-filter cat -- --all
+
+# 3. 強制プッシュ
+git push origin feature/article-audio-reader-clean --force
+
+# 4. .gitignoreに追加（再発防止）
+echo "audio-reader/service-account-key.json" >> .gitignore
+git add .gitignore
+git commit -m "service-account-key.jsonを.gitignoreに追加"
 ```
 
 
 **📝 稀なエラー（過去10回のデプロイで1回以下と推定）:**
 
-**問題3: 音声ファイルサイズが大きすぎる（GitHub 100MB制限）**
+**問題3: Playwright ブラウザが未インストール**
+- **発生頻度**: 推定5%（10回中0.5回）
+- **主な原因**: Playwrightブラウザバイナリが更新されていない
+- **対処時間**: 平均1分
+```bash
+# エラーメッセージ例:
+# Failed to initialize browser: browserType.launch: Executable doesn't exist at C:\Users\Tenormusica\AppData\Local\ms-playwright\chromium-1179\chrome-win\chrome.exe
+
+# 原因: Playwrightの新しいバージョンで古いブラウザバイナリが使用できない
+
+# 根本的な解決方法:
+npx playwright install
+
+# 回避策（デプロイ確認にcurlを使用）:
+curl -s https://tenormusica2024.github.io/zenn-ai-news/ | grep -E "(記事スラッグ|availableArticles)"
+```
+
+**問題3-A: 音声ファイルサイズが大きすぎる（GitHub 100MB制限）**
 - **発生頻度**: 推定10%（10回中1回）
 - **主な原因**: 1万文字超の長文記事
 - **対処時間**: 平均15分
@@ -528,7 +659,28 @@ git ls-files | grep [スラッグ]
 git ls-files audio-reader/web/[スラッグ]-thumbnail.jpg
 ```
 
-**問題7: チャンク分割が正しく動作しない**
+**問題7: Bash コマンドの `&amp;&amp;` エスケープエラー**
+- **発生頻度**: 推定5%（10回中0.5回）
+- **主な原因**: XML/HTMLエンコードされた文字列がBashコマンドに渡される
+- **対処時間**: 平均1分
+```bash
+# エラーメッセージ例:
+# /usr/bin/bash: eval: line 1: syntax error near unexpected token `;&'
+
+# 原因: XML/HTMLエンティティエンコードされた `&amp;&amp;` がBashコマンドに渡される
+
+# ❌ 誤った記述
+cd "path" &amp;&amp; git add file
+
+# ✅ 正しい記述
+cd "path" && git add file
+
+# 注意事項:
+# - Bash コマンドには HTML エンティティエンコーディングを使用しない
+# - `&&` はそのまま記述する
+```
+
+**問題7-A: チャンク分割が正しく動作しない**
 ```bash
 # 症状: 音声が途中で途切れる、または再生されない
 # 原因: Markdown解析エラー、またはチャンク分割ロジックの問題
