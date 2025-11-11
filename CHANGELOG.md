@@ -5,17 +5,21 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Google Analytics トラッキング実装（2025-11-11）
-  - 訪問者数・ページビュー数の追跡機能
-  - 初回実装: ポートフォリオサイトと共用の測定ID（G-YJ1WP1J2NQ）使用
-  - 今後: 専用測定ID発行予定（データ混在回避のため）
+- Google Analytics 専用プロパティ実装完了（2025-11-11）
+  - 測定ID: G-9JGSVRVHQ4（zenn-ai-news専用）
+  - データ混在問題を解決（ポートフォリオサイトと分離）
+  - 訪問者数・ページビュー数の正確な追跡が可能に
 - ANALYTICS_SETUP.md ドキュメント作成
   - Google Analytics設定手順の詳細記録
   - 新規プロパティ作成手順
   - トラブルシューティングガイド
+  - 測定ID変更履歴
 
 ### Changed
-- index.html に gtag.js トラッキングコード追加
+- index.html の測定IDを専用IDに変更（G-YJ1WP1J2NQ → G-9JGSVRVHQ4）
+
+### Fixed
+- Analytics データ混在問題を解決
 
 ## [1.0.0] - 2025-11-11
 
