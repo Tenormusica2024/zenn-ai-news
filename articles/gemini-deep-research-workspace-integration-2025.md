@@ -1,5 +1,9 @@
 ---
+<<<<<<< HEAD
 title: "Gemini Deep ResearchがGmail・Drive・Chat統合。でも本当に使えるのか？"
+=======
+title: "Gemini Deep ResearchがGmail・Drive・Chat統合。でも本当に使えるのか?"
+>>>>>>> feature/article-audio-reader
 emoji: "🔍"
 type: "tech"
 topics: ["AI", "Google", "Gemini", "機械学習"]
@@ -78,4 +82,8 @@ Workspace統合については、TechCrunch、Engadget、The Register、CyberSec
 
 これらが揃って初めて、業務で信頼できるツールになります。現状は「面白い実験」の域を出ていません。
 
+<<<<<<< HEAD
 もう少し様子を見てから判断するのが賢明だと思います。
+=======
+もう少し様子を見てから判断するのが賢明だと思います。
+>>>>>>> feature/article-audio-reader
