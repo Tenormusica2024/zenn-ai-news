@@ -3,7 +3,7 @@ title: "X (Twitter) が11月から「いいね数」を捨てる – Grok AIが�
 emoji: "🤖"
 type: "tech"
 topics: ["X", "Twitter", "Grok", "AI", "SNS"]
-published: false
+published: true
 ---
 
 ## 11月、Xのタイムラインが完全に変わる
