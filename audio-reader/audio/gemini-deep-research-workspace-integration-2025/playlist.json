@@ -1,0 +1,12 @@
+{
+  "article": "gemini-deep-research-workspace-integration-2025.md",
+  "speaker": "ja-normal",
+  "speakerName": "日本語（標準）",
+  "chunks": [
+    "article_ja-normal_chunk_01.mp3",
+    "article_ja-normal_chunk_02.mp3"
+  ],
+  "totalChunks": 2,
+  "engine": "Google Cloud TTS",
+  "createdAt": "2025-11-11T19:26:29.749842"
+}

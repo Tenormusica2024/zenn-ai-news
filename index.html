@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zenn Article Audio Reader</title>
+  
+  <!-- Google tag (gtag.js) -->
+  <!-- Zenn AI News 専用測定ID: G-9JGSVRVHQ4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9JGSVRVHQ4"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-9JGSVRVHQ4');
+  </script>
+  
   <style>
     * {
       margin: 0;
@@ -655,6 +666,7 @@
         <select id="voiceSelect">
           <option value="ja-male" selected>Japanese Male (Google Cloud TTS)</option>
           <option value="ja-female">Japanese Female (Google Cloud TTS)</option>
+          <option value="ja-normal">Japanese Normal (Google Cloud TTS)</option>
         </select>
       </div>
       
@@ -720,6 +732,22 @@
     
     // 利用可能な記事リスト
     const availableArticles = [
+      {
+        slug: 'gemini-deep-research-workspace-integration-2025',
+        title: 'Gemini Deep Research × Workspace統合の真価',
+        thumbnail: 'audio-reader/web/ai-agents-thumbnail.jpg',
+        publishDate: '2025/11/11',
+        url: 'https://zenn.dev/dragonrondo/articles/gemini-deep-research-workspace-integration-2025',
+        likes: 0
+      },
+      {
+        slug: 'chatgpt-vulnerabilities-hackedgpt-2025',
+        title: 'ChatGPT脆弱性「HackedGPT」が示す生成AI時代のセキュリティ限界',
+        thumbnail: 'audio-reader/web/chatgpt-vulnerabilities-thumbnail.jpg',
+        publishDate: '2025/11/10',
+        url: 'https://zenn.dev/dragonrondo/articles/chatgpt-vulnerabilities-hackedgpt-2025',
+        likes: 0
+      },
       {
         slug: 'github-agent-hq-unified-ai-coding-2025',
         title: 'GitHub Agent HQ統合AI開発環境2025',

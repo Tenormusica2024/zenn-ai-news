@@ -1,0 +1,14 @@
+{
+  "article": "chatgpt-vulnerabilities-hackedgpt-2025.md",
+  "speaker": "ja-female",
+  "speakerName": "日本語（女性）",
+  "chunks": [
+    "article_ja-female_chunk_01.mp3",
+    "article_ja-female_chunk_02.mp3",
+    "article_ja-female_chunk_03.mp3",
+    "article_ja-female_chunk_04.mp3"
+  ],
+  "totalChunks": 4,
+  "engine": "Google Cloud TTS",
+  "createdAt": "2025-11-10T14:41:09.947694"
+}
